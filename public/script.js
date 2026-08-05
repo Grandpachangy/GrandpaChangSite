@@ -1,0 +1,117 @@
+const CHANNEL = "grandpachang";
+const LIVE_POLL_MS = 60 * 1000;
+
+const parentHost = window.location.hostname || "localhost";
+
+const liveBanner = document.getElementById("live-banner");
+const liveTitleEl = document.getElementById("live-title");
+const liveViewersEl = document.getElementById("live-viewers");
+const livePlayerSection = document.getElementById("live-player-section");
+const livePlayerFrame = document.getElementById("live-player");
+
+const vodsStatus = document.getElementById("vods-status");
+const vodsGrid = document.getElementById("vods-grid");
+
+let isLiveEmbedded = false;
+
+async function checkLive() {
+  try {
+    const res = await fetch("/api/live");
+    const data = await res.json();
+
+    if (data.live) {
+      liveBanner.classList.remove("is-hidden");
+      liveTitleEl.textContent = data.title || "";
+      liveViewersEl.textContent = data.viewers ? `${data.viewers.toLocaleString()} watching` : "";
+
+      if (!isLiveEmbedded) {
+        livePlayerFrame.src = `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=false`;
+        livePlayerSection.classList.remove("is-hidden");
+        isLiveEmbedded = true;
+      }
+    } else {
+      liveBanner.classList.add("is-hidden");
+      livePlayerSection.classList.add("is-hidden");
+      if (isLiveEmbedded) {
+        livePlayerFrame.src = "";
+        isLiveEmbedded = false;
+      }
+    }
+  } catch (err) {
+    console.error("Live check failed:", err);
+  }
+}
+
+function formatDuration(iso) {
+  const match = iso.match(/(\d+h)?(\d+m)?(\d+s)?/);
+  if (!match) return iso;
+  const [, h, m] = match;
+  if (h && m) return `${h.replace("h", "h ")}${m}`;
+  if (h) return h;
+  if (m) return m;
+  return iso;
+}
+
+function timeAgo(dateStr) {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days === 1) return "1 day ago";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months > 1 ? "s" : ""} ago`;
+  const years = Math.floor(months / 12);
+  return `${years} year${years > 1 ? "s" : ""} ago`;
+}
+
+async function loadVods() {
+  try {
+    const res = await fetch("/api/vods");
+    const data = await res.json();
+
+    if (!data.vods || data.vods.length === 0) {
+      vodsStatus.textContent = "No VODs found yet.";
+      return;
+    }
+
+    vodsStatus.classList.add("is-hidden");
+
+    vodsGrid.innerHTML = data.vods
+      .map(
+        (vod) => `
+      <article class="vod-card">
+        <div class="vod-card__player">
+          <iframe
+            src="https://player.twitch.tv/?video=${vod.id}&parent=${parentHost}&autoplay=false"
+            allowfullscreen
+            scrolling="no"
+            loading="lazy"
+          ></iframe>
+        </div>
+        <div class="vod-card__body">
+          <p class="vod-card__title">${escapeHtml(vod.title)}</p>
+          <div class="vod-card__meta">
+            <span>${formatDuration(vod.duration)}</span>
+            <span>&middot;</span>
+            <span>${timeAgo(vod.publishedAt)}</span>
+          </div>
+        </div>
+      </article>
+    `
+      )
+      .join("");
+  } catch (err) {
+    vodsStatus.textContent = "Couldn't load VODs right now.";
+    console.error("VOD load failed:", err);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+checkLive();
+loadVods();
+setInterval(checkLive, LIVE_POLL_MS);

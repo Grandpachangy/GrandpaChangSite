@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GrandpaChang | Live &amp; VODs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="starfield" id="starfield" aria-hidden="true"></div>
+  <div class="planet planet--one" aria-hidden="true"></div>
+  <div class="planet planet--two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark">✦</span>
+      <span class="brand-name">GrandpaChang</span>
+    </div>
+    <a class="twitch-link" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">
+      twitch.tv/grandpachang
+    </a>
+  </header>
+
+  <main>
+    <section id="live-banner" class="live-banner is-hidden">
+      <div class="live-banner__inner">
+        <span class="live-dot"></span>
+        <div class="live-banner__text">
+          <strong>LIVE NOW</strong>
+          <span id="live-title"></span>
+        </div>
+        <span id="live-viewers" class="live-viewers"></span>
+      </div>
+    </section>
+
+    <section id="live-player-section" class="live-player-section is-hidden">
+      <div class="player-frame">
+        <iframe
+          id="live-player"
+          src=""
+          allowfullscreen
+          scrolling="no"
+        ></iframe>
+      </div>
+    </section>
+
+    <section class="hero" id="hero">
+      <h1>Streams from another galaxy.</h1>
+      <p>Catch every broadcast — live or recorded — beamed straight from Twitch, full quality, no re-encoding.</p>
+    </section>
+
+    <section class="vods-section">
+      <h2>Recent VODs</h2>
+      <div id="vods-status" class="vods-status">Loading VODs&hellip;</div>
+      <div id="vods-grid" class="vods-grid"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Not affiliated with Twitch Interactive, Inc. Video played via Twitch's official embedded player.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
