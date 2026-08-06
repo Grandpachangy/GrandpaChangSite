@@ -43,13 +43,20 @@
 
     <section id="live-player-section" class="live-player-section is-hidden">
       <div class="watch-layout">
-        <div class="player-frame">
-          <iframe
-            id="live-player"
-            src=""
-            allowfullscreen
-            scrolling="no"
-          ></iframe>
+        <div class="player-slot">
+          <div class="player-frame" id="player-frame">
+            <button type="button" id="popout-toggle" class="popout-btn" title="Pop out player" aria-label="Pop out player">⤢</button>
+            <iframe
+              id="live-player"
+              src=""
+              allowfullscreen
+              scrolling="no"
+            ></iframe>
+          </div>
+          <div id="player-placeholder" class="player-placeholder is-hidden">
+            <p>Playing in a pop-out window.</p>
+            <button type="button" id="popout-restore" class="popout-restore-btn">Bring back</button>
+          </div>
         </div>
         <div class="chat-frame">
           <iframe

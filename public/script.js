@@ -13,7 +13,24 @@ const liveChatFrame = document.getElementById("live-chat");
 const vodsStatus = document.getElementById("vods-status");
 const vodsGrid = document.getElementById("vods-grid");
 
+const playerFrame = document.getElementById("player-frame");
+const playerPlaceholder = document.getElementById("player-placeholder");
+const popoutToggle = document.getElementById("popout-toggle");
+const popoutRestore = document.getElementById("popout-restore");
+
 let isLiveEmbedded = false;
+let isPoppedOut = false;
+
+function setPoppedOut(poppedOut) {
+  isPoppedOut = poppedOut;
+  playerFrame.classList.toggle("is-popped-out", poppedOut);
+  playerPlaceholder.classList.toggle("is-hidden", !poppedOut);
+  popoutToggle.textContent = poppedOut ? "⤡" : "⤢";
+  popoutToggle.title = poppedOut ? "Return player" : "Pop out player";
+}
+
+popoutToggle.addEventListener("click", () => setPoppedOut(!isPoppedOut));
+popoutRestore.addEventListener("click", () => setPoppedOut(false));
 
 async function checkLive() {
   try {
@@ -38,6 +55,7 @@ async function checkLive() {
         livePlayerFrame.src = "";
         liveChatFrame.src = "";
         isLiveEmbedded = false;
+        setPoppedOut(false);
       }
     }
   } catch (err) {

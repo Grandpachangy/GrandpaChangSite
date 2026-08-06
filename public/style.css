@@ -214,10 +214,18 @@ main {
   align-items: stretch;
 }
 
-.player-frame {
+.player-slot {
   position: relative;
   width: 100%;
+  height: 0;
   padding-top: 56.25%;
+}
+
+.player-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--card-border);
@@ -230,6 +238,75 @@ main {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.popout-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(5, 6, 15, 0.65);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.popout-btn:hover {
+  background: rgba(139, 123, 255, 0.35);
+  border-color: var(--accent-soft);
+}
+
+.player-frame.is-popped-out {
+  position: fixed;
+  inset: auto;
+  top: auto;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  left: auto;
+  width: min(360px, 90vw);
+  height: auto;
+  padding-top: min(202px, 50.6vw);
+  z-index: 500;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+}
+
+.player-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border-radius: 16px;
+  border: 1px dashed var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.popout-restore-btn {
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text);
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.popout-restore-btn:hover {
+  border-color: var(--accent-soft);
+  color: var(--accent-soft);
 }
 
 .chat-frame {
