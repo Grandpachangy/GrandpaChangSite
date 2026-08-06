@@ -218,7 +218,7 @@ main {
 .watch-layout.chat-only {
   grid-template-columns: 1fr;
   max-width: 420px;
-  margin: 0 auto;
+  margin: 0 0 0 auto;
 }
 
 .watch-layout.chat-only .chat-frame {
