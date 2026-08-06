@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://player.twitch.tv" />
   <link rel="preconnect" href="https://static-cdn.jtvnw.net" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/space-grotesk-700-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -76,12 +77,34 @@
 
     <section class="vods-section">
       <h2>Recent VODs</h2>
-      <div id="vods-status" class="vods-status">Loading VODs&hellip;</div>
       <div class="vods-carousel">
         <button type="button" id="vods-prev" class="vods-nav vods-nav--prev" aria-label="Scroll to previous VODs">‹</button>
-        <div id="vods-grid" class="vods-grid"></div>
+        <div id="vods-grid" class="vods-grid">
+          <article class="vod-card vod-card--skeleton" aria-hidden="true">
+            <div class="vod-card__player"></div>
+            <div class="vod-card__body">
+              <p class="vod-card__title">&nbsp;</p>
+              <div class="vod-card__meta"><span>&nbsp;</span></div>
+            </div>
+          </article>
+          <article class="vod-card vod-card--skeleton" aria-hidden="true">
+            <div class="vod-card__player"></div>
+            <div class="vod-card__body">
+              <p class="vod-card__title">&nbsp;</p>
+              <div class="vod-card__meta"><span>&nbsp;</span></div>
+            </div>
+          </article>
+          <article class="vod-card vod-card--skeleton" aria-hidden="true">
+            <div class="vod-card__player"></div>
+            <div class="vod-card__body">
+              <p class="vod-card__title">&nbsp;</p>
+              <div class="vod-card__meta"><span>&nbsp;</span></div>
+            </div>
+          </article>
+        </div>
         <button type="button" id="vods-next" class="vods-nav vods-nav--next" aria-label="Scroll to next VODs">›</button>
       </div>
+      <div id="vods-status" class="vods-status is-hidden"></div>
     </section>
   </main>
 

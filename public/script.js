@@ -94,11 +94,11 @@ async function loadVods() {
     const data = await res.json();
 
     if (!data.vods || data.vods.length === 0) {
+      vodsGrid.innerHTML = "";
       vodsStatus.textContent = "No VODs found yet.";
+      vodsStatus.classList.remove("is-hidden");
       return;
     }
-
-    vodsStatus.classList.add("is-hidden");
 
     vodsGrid.innerHTML = data.vods
       .map(
@@ -128,7 +128,9 @@ async function loadVods() {
 
     updateVodsNav();
   } catch (err) {
+    vodsGrid.innerHTML = "";
     vodsStatus.textContent = "Couldn't load VODs right now.";
+    vodsStatus.classList.remove("is-hidden");
     console.error("VOD load failed:", err);
   }
 }

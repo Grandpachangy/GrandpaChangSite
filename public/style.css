@@ -503,6 +503,34 @@ main {
   border-color: rgba(139, 123, 255, 0.4);
 }
 
+/* Placeholder cards rendered in the HTML so the carousel occupies its
+   final height before the VOD data arrives (avoids layout shift). */
+.vod-card--skeleton {
+  pointer-events: none;
+}
+
+.vod-card--skeleton:hover {
+  transform: none;
+  border-color: var(--card-border);
+}
+
+.vod-card--skeleton .vod-card__player {
+  background: linear-gradient(100deg, #0c0f1e 30%, #141830 50%, #0c0f1e 70%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vod-card--skeleton .vod-card__player {
+    animation: none;
+  }
+}
+
 .vod-card__player {
   position: relative;
   width: 100%;
@@ -556,6 +584,11 @@ main {
 .vod-card__title {
   font-size: 0.95rem;
   font-weight: 600;
+  line-height: 1.35;
+  /* Always reserve exactly two lines so cards keep a constant height
+     whether the title wraps, is one line, or is empty. Prevents layout
+     shift when real VOD data replaces the skeleton placeholders. */
+  height: 2.7em;
   margin: 0 0 0.4rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
