@@ -100,10 +100,15 @@ async function loadVods() {
 
     vodsGrid.innerHTML = data.vods
       .map(
-        (vod) => `
+        (vod, i) => `
       <article class="vod-card">
         <div class="vod-card__player" data-video-id="${vod.id}">
-          <img src="${vod.thumbnailUrl}" alt="" loading="lazy" />
+          <img
+            src="${vod.thumbnailUrl}"
+            alt=""
+            loading="${i < 2 ? "eager" : "lazy"}"
+            fetchpriority="${i < 2 ? "high" : "auto"}"
+          />
           <button type="button" class="vod-card__play" aria-label="Play ${escapeHtml(vod.title)}">▶</button>
         </div>
         <div class="vod-card__body">
