@@ -35,6 +35,26 @@ function setPoppedOut(poppedOut) {
 popoutToggle.addEventListener("click", () => setPoppedOut(!isPoppedOut));
 popoutRestore.addEventListener("click", () => setPoppedOut(false));
 
+// Side stream: itzon.tv's own /embed/<channel> endpoint, shown in a small
+// floating window. The Twitch player keeps running untouched alongside it.
+const sidestream = document.getElementById("sidestream");
+const sidestreamFrame = document.getElementById("sidestream-frame");
+const sidestreamToggle = document.getElementById("sidestream-toggle");
+const sidestreamClose = document.getElementById("sidestream-close");
+
+let isSidestreamOpen = false;
+
+function setSidestream(open) {
+  isSidestreamOpen = open;
+  sidestream.classList.toggle("is-hidden", !open);
+  sidestreamToggle.classList.toggle("is-active", open);
+  // Only hold a connection while it's actually on screen.
+  sidestreamFrame.src = open ? `https://itzon.tv/embed/${CHANNEL}` : "";
+}
+
+sidestreamToggle.addEventListener("click", () => setSidestream(!isSidestreamOpen));
+sidestreamClose.addEventListener("click", () => setSidestream(false));
+
 async function checkLive() {
   try {
     const res = await fetch("/api/live");
@@ -59,6 +79,7 @@ async function checkLive() {
         livePlayerFrame.src = "";
         isLiveEmbedded = false;
         setPoppedOut(false);
+        setSidestream(false);
       }
     }
   } catch (err) {

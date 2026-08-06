@@ -297,11 +297,17 @@ main {
   border: none;
 }
 
-.popout-btn {
+.player-controls {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 5;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.popout-btn {
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -313,6 +319,18 @@ main {
   cursor: pointer;
   backdrop-filter: blur(4px);
   transition: background 0.15s, border-color 0.15s;
+}
+
+.popout-btn--wide {
+  width: auto;
+  padding: 0 0.7rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.popout-btn--wide.is-active {
+  background: rgba(139, 123, 255, 0.5);
+  border-color: var(--accent-soft);
 }
 
 .popout-btn:hover {
@@ -332,6 +350,76 @@ main {
   padding-top: min(202px, 50.6vw);
   z-index: 500;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+}
+
+/* Floating ITZon mirror. Docks bottom-left so it never collides with a
+   popped-out Twitch player (bottom-right). */
+.sidestream {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  z-index: 500;
+  width: min(340px, 90vw);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  background: #05060f;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+}
+
+.sidestream__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidestream__label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
+}
+
+.sidestream__close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidestream__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.sidestream__frame {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: #000;
+}
+
+.sidestream__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+@media (max-width: 640px) {
+  .sidestream {
+    width: min(260px, 70vw);
+    left: 0.75rem;
+    bottom: 0.75rem;
+  }
 }
 
 .player-placeholder {

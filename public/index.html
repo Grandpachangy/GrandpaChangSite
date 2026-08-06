@@ -47,7 +47,10 @@
         <div id="live-player-section" class="is-hidden">
           <div class="player-slot">
             <div class="player-frame" id="player-frame">
-              <button type="button" id="popout-toggle" class="popout-btn" title="Pop out player" aria-label="Pop out player">⤢</button>
+              <div class="player-controls">
+                <button type="button" id="sidestream-toggle" class="popout-btn popout-btn--wide" title="Open the ITZon mirror in a side window">⧉ Side stream</button>
+                <button type="button" id="popout-toggle" class="popout-btn" title="Pop out player" aria-label="Pop out player">⤢</button>
+              </div>
               <iframe
                 id="live-player"
                 src=""
@@ -74,6 +77,16 @@
         <a href="https://www.twitch.tv/popout/grandpachang/chat" target="_blank" rel="noopener">Open chat in a new window ↗</a>
       </p>
     </section>
+
+    <aside id="sidestream" class="sidestream is-hidden" aria-label="ITZon side stream">
+      <div class="sidestream__bar">
+        <span class="sidestream__label">ITZon mirror</span>
+        <button type="button" id="sidestream-close" class="sidestream__close" aria-label="Close side stream">✕</button>
+      </div>
+      <div class="sidestream__frame">
+        <iframe id="sidestream-frame" src="" allowfullscreen scrolling="no"></iframe>
+      </div>
+    </aside>
 
     <section class="hero" id="hero">
       <h1>GrandpaChang's Live Streams</h1>
