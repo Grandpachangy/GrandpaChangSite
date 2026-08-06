@@ -207,6 +207,13 @@ main {
   margin: 1.5rem 0;
 }
 
+.watch-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
 .player-frame {
   position: relative;
   width: 100%;
@@ -223,6 +230,32 @@ main {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.chat-frame {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  min-height: 300px;
+}
+
+.chat-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+@media (max-width: 800px) {
+  .watch-layout {
+    grid-template-columns: 1fr;
+  }
+  .chat-frame {
+    height: 420px;
+    min-height: 0;
+  }
 }
 
 /* ---------- Hero ---------- */

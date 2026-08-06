@@ -8,6 +8,7 @@ const liveTitleEl = document.getElementById("live-title");
 const liveViewersEl = document.getElementById("live-viewers");
 const livePlayerSection = document.getElementById("live-player-section");
 const livePlayerFrame = document.getElementById("live-player");
+const liveChatFrame = document.getElementById("live-chat");
 
 const vodsStatus = document.getElementById("vods-status");
 const vodsGrid = document.getElementById("vods-grid");
@@ -26,6 +27,7 @@ async function checkLive() {
 
       if (!isLiveEmbedded) {
         livePlayerFrame.src = `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=false`;
+        liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
         livePlayerSection.classList.remove("is-hidden");
         isLiveEmbedded = true;
       }
@@ -34,6 +36,7 @@ async function checkLive() {
       livePlayerSection.classList.add("is-hidden");
       if (isLiveEmbedded) {
         livePlayerFrame.src = "";
+        liveChatFrame.src = "";
         isLiveEmbedded = false;
       }
     }
