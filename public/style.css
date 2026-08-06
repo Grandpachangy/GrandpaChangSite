@@ -907,6 +907,46 @@ main {
   gap: 0.6rem;
 }
 
+/* ---------- Socials ---------- */
+.socials-section {
+  margin-top: 4rem;
+  scroll-margin-top: 2rem;
+}
+
+.socials-section h2 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+}
+
+.socials-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+  border: 1px solid var(--card-border);
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.social-link:hover {
+  border-color: var(--accent-soft);
+  color: var(--accent-soft);
+}
+
+.social-link__mark {
+  color: var(--accent-soft);
+}
+
 /* ---------- Footer ---------- */
 .site-footer {
   text-align: center;
