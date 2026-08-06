@@ -13,6 +13,8 @@ const liveChatFrame = document.getElementById("live-chat");
 
 const vodsStatus = document.getElementById("vods-status");
 const vodsGrid = document.getElementById("vods-grid");
+const vodsPrev = document.getElementById("vods-prev");
+const vodsNext = document.getElementById("vods-next");
 
 const playerFrame = document.getElementById("player-frame");
 const playerPlaceholder = document.getElementById("player-placeholder");
@@ -123,6 +125,8 @@ async function loadVods() {
     `
       )
       .join("");
+
+    updateVodsNav();
   } catch (err) {
     vodsStatus.textContent = "Couldn't load VODs right now.";
     console.error("VOD load failed:", err);
@@ -149,6 +153,21 @@ vodsGrid.addEventListener("click", (e) => {
     ></iframe>
   `;
 });
+
+function updateVodsNav() {
+  const maxScroll = vodsGrid.scrollWidth - vodsGrid.clientWidth;
+  vodsPrev.disabled = vodsGrid.scrollLeft <= 4;
+  vodsNext.disabled = vodsGrid.scrollLeft >= maxScroll - 4;
+}
+
+function scrollVods(direction) {
+  vodsGrid.scrollBy({ left: direction * vodsGrid.clientWidth, behavior: "smooth" });
+}
+
+vodsPrev.addEventListener("click", () => scrollVods(-1));
+vodsNext.addEventListener("click", () => scrollVods(1));
+vodsGrid.addEventListener("scroll", updateVodsNav);
+window.addEventListener("resize", updateVodsNav);
 
 let isChatLoaded = false;
 function loadChat() {

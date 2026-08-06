@@ -77,7 +77,11 @@
     <section class="vods-section">
       <h2>Recent VODs</h2>
       <div id="vods-status" class="vods-status">Loading VODs&hellip;</div>
-      <div id="vods-grid" class="vods-grid"></div>
+      <div class="vods-carousel">
+        <button type="button" id="vods-prev" class="vods-nav vods-nav--prev" aria-label="Scroll to previous VODs">‹</button>
+        <div id="vods-grid" class="vods-grid"></div>
+        <button type="button" id="vods-next" class="vods-nav vods-nav--next" aria-label="Scroll to next VODs">›</button>
+      </div>
     </section>
   </main>
 

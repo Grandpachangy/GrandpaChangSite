@@ -417,18 +417,85 @@ main {
   display: none !important;
 }
 
+.vods-carousel {
+  position: relative;
+}
+
 .vods-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
   gap: 1.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0.25rem;
+}
+
+.vods-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .vod-card {
+  flex: 0 0 calc((100% - 3rem) / 3);
+  min-width: 0;
+  scroll-snap-align: start;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 14px;
   overflow: hidden;
   transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.vods-nav {
+  position: absolute;
+  top: 40%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+  background: rgba(5, 6, 15, 0.75);
+  color: var(--text);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.vods-nav:hover {
+  background: rgba(139, 123, 255, 0.35);
+  border-color: var(--accent-soft);
+}
+
+.vods-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.vods-nav--prev {
+  left: -14px;
+}
+
+.vods-nav--next {
+  right: -14px;
+}
+
+@media (max-width: 800px) {
+  .vod-card {
+    flex-basis: 78%;
+  }
+}
+
+@media (max-width: 480px) {
+  .vod-card {
+    flex-basis: 88%;
+  }
+  .vods-nav {
+    display: none;
+  }
 }
 
 .vod-card:hover {
