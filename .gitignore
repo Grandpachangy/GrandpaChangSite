@@ -2,3 +2,6 @@
 .vercel
 node_modules
 .claude/
+
+# Images the harness drops into the repo root when pasted in chat
+image-*.png
