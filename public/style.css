@@ -1,12 +1,12 @@
 :root {
-  --bg-deep: #0b0e1f;
-  --bg-mid: #131832;
+  --bg-deep: #05060f;
+  --bg-mid: #0b0e20;
   --accent: #8b7bff;
   --accent-soft: #5eead4;
   --text: #e8e9f5;
-  --text-dim: #a2a6c4;
-  --card-bg: rgba(255, 255, 255, 0.04);
-  --card-border: rgba(255, 255, 255, 0.08);
+  --text-dim: #8d91b0;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.07);
   --live-red: #ff5470;
 }
 
@@ -21,7 +21,7 @@ html, body {
 }
 
 body {
-  background: radial-gradient(ellipse at top, var(--bg-mid) 0%, var(--bg-deep) 55%, #06070f 100%);
+  background: radial-gradient(ellipse at top, var(--bg-mid) 0%, var(--bg-deep) 55%, #020207 100%);
   color: var(--text);
   font-family: "Inter", system-ui, sans-serif;
   position: relative;
@@ -111,6 +111,14 @@ main, .site-header, .site-footer {
 
 .brand-mark {
   color: var(--accent-soft);
+}
+
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .twitch-link {
