@@ -145,8 +145,18 @@ vodsGrid.addEventListener("click", (e) => {
   `;
 });
 
-liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
 watchLayout.classList.add("chat-only");
+
+function loadChat() {
+  if (liveChatFrame.src) return;
+  liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
+}
+
+if (document.readyState === "complete") {
+  loadChat();
+} else {
+  window.addEventListener("load", loadChat, { once: true });
+}
 
 checkLive();
 loadVods();
