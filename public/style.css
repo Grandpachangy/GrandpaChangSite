@@ -178,47 +178,126 @@ body {
   100% { transform: translate3d(90vw, 30vh, 0) rotate(18deg); opacity: 0; }
 }
 
-/* ---------- Planets (subtle, decorative) ---------- */
-.planet {
+/* ---------- Planets ----------
+   Ringed gas giant, cratered moon, and a small teal world, per the
+   Claude Design "Dark space theme website design" project.           */
+.planet-giant {
   position: absolute;
+  top: 5%;
+  right: -90px;
+  width: 340px;
+  height: 340px;
+}
+
+.planet-giant__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 400px;
+  height: 88px;
+  border: solid rgba(230, 225, 255, 0.55);
+  border-width: 4px 0;
   border-radius: 50%;
-  filter: blur(0.5px);
-  opacity: 0.5;
+  opacity: 0.6;
+  animation: ring-spin 90s linear infinite;
   will-change: transform;
 }
 
-.planet--one {
-  top: 8%;
-  right: -60px;
-  width: 160px;
-  height: 160px;
-  background: radial-gradient(circle at 35% 30%, #9b8bff 0%, #4a3f9e 60%, #241f52 100%);
-  box-shadow: 0 0 60px rgba(139, 123, 255, 0.25);
-  animation: float-slow 22s ease-in-out infinite alternate;
+.planet-giant__body {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  box-shadow: 0 0 90px rgba(139, 123, 255, 0.35), inset -22px -22px 55px rgba(0, 0, 0, 0.45);
+  background-image:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.4), transparent 22%),
+    repeating-linear-gradient(
+      178deg,
+      rgba(255, 255, 255, 0.08) 0px, rgba(255, 255, 255, 0.08) 8px,
+      transparent 8px, transparent 20px,
+      rgba(0, 0, 0, 0.08) 20px, rgba(0, 0, 0, 0.08) 27px
+    ),
+    radial-gradient(circle at 40% 35%, #c9beff 0%, #9b8bff 22%, #6f5fe0 46%, #4a3f9e 72%, #241f52 100%);
+  animation: giant-bob-spin 70s ease-in-out infinite;
+  will-change: transform;
 }
 
-.planet--two {
-  bottom: 5%;
-  left: -40px;
-  width: 90px;
-  height: 90px;
-  background: radial-gradient(circle at 40% 35%, #7fe9d8 0%, #2c8f82 60%, #164a44 100%);
-  box-shadow: 0 0 40px rgba(94, 234, 212, 0.2);
-  opacity: 0.35;
-  animation: float-slow 17s ease-in-out infinite alternate-reverse;
+.planet-moon {
+  position: absolute;
+  bottom: 6%;
+  left: -50px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  opacity: 0.85;
+  box-shadow: 0 0 50px rgba(139, 123, 255, 0.2), inset -16px -16px 32px rgba(0, 0, 0, 0.45);
+  background-image:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.35) 0%, transparent 9%),
+    radial-gradient(circle at 66% 58%, rgba(0, 0, 0, 0.28) 0%, transparent 11%),
+    radial-gradient(circle at 44% 80%, rgba(0, 0, 0, 0.22) 0%, transparent 10%),
+    radial-gradient(circle at 76% 30%, rgba(0, 0, 0, 0.2) 0%, transparent 8%),
+    radial-gradient(circle at 40% 40%, #a89bd9 0%, #6f5fa8 50%, #3a3163 100%);
+  animation: moon-bob-spin 55s ease-in-out infinite;
+  will-change: transform;
 }
 
-@keyframes float-slow {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(0, -18px, 0); }
+.planet-small {
+  position: absolute;
+  top: 58%;
+  left: 12%;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  opacity: 0.7;
+  box-shadow: 0 0 45px rgba(94, 234, 212, 0.35);
+  background-image: radial-gradient(circle at 35% 30%, #bff6ea 0%, #5eead4 30%, #2c8f82 62%, #123c37 100%);
+  animation: small-bob-spin 45s ease-in-out infinite, twinkle-bright 4s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
-/* Respect users who ask for less motion: keep the scene, drop the movement. */
+/* The ring and giant carry translate(-50%,-50%) inside the keyframes,
+   since a transform animation would otherwise override the centring. */
+@keyframes ring-spin {
+  from { transform: translate(-50%, -50%) rotate(-16deg); }
+  to { transform: translate(-50%, -50%) rotate(344deg); }
+}
+
+@keyframes giant-bob-spin {
+  0% { transform: translate(-50%, -50%) translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate(-50%, -50%) translate3d(0, -16px, 0) rotate(180deg); }
+  100% { transform: translate(-50%, -50%) translate3d(0, 0, 0) rotate(360deg); }
+}
+
+@keyframes moon-bob-spin {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, 12px, 0) rotate(-180deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(-360deg); }
+}
+
+@keyframes small-bob-spin {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -10px, 0) rotate(180deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(360deg); }
+}
+
+/* Respect users who ask for less motion: keep the scene, drop the movement.
+   The ring and giant keep their centring transform, minus the animation. */
 @media (prefers-reduced-motion: reduce) {
   .stars,
   .nebula,
-  .planet {
+  .planet-moon,
+  .planet-small,
+  .planet-giant__ring,
+  .planet-giant__body {
     animation: none !important;
+  }
+  .planet-giant__ring {
+    transform: translate(-50%, -50%) rotate(-16deg);
+  }
+  .planet-giant__body {
+    transform: translate(-50%, -50%);
   }
   .shooting-star {
     display: none;
@@ -844,12 +923,22 @@ main {
   main {
     padding: 0 1.25rem 3rem;
   }
-  .planet--one {
-    width: 100px;
-    height: 100px;
+  /* Scale the planets down so they stay decorative rather than dominating
+     a phone screen. The giant scales as a unit via transform-origin. */
+  .planet-giant {
+    width: 200px;
+    height: 200px;
+    right: -70px;
+    transform: scale(0.62);
+    transform-origin: top right;
   }
-  .planet--two {
-    width: 60px;
-    height: 60px;
+  .planet-moon {
+    width: 92px;
+    height: 92px;
+    left: -34px;
+  }
+  .planet-small {
+    width: 52px;
+    height: 52px;
   }
 }
