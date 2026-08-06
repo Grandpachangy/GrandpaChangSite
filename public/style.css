@@ -427,32 +427,69 @@ main {
   margin: 1.5rem 0;
 }
 
-/* Default layout matches the (far more common) offline state: chat only,
-   right-aligned. JS adds .is-live for the two-column player+chat layout,
-   so there's no post-load layout flip for the common case. */
+/* Two columns in both states: the stage column holds the live player when
+   live and a matching bordered panel when offline, so the layout never
+   changes shape after load (no post-load flip, no layout shift). */
 .watch-layout {
   display: grid;
-  grid-template-columns: 1fr;
-  max-width: 420px;
-  margin: 0 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 1rem;
   align-items: stretch;
 }
 
 .watch-layout .chat-frame {
-  height: 480px;
-  min-height: 0;
-}
-
-.watch-layout.is-live {
-  grid-template-columns: minmax(0, 1fr) 320px;
-  max-width: none;
-  margin: 0;
-}
-
-.watch-layout.is-live .chat-frame {
   height: auto;
   min-height: 300px;
+}
+
+/* Offline stand-in for the player, carrying the same frame treatment as
+   .player-frame so the pair reads as one set of panels either way. */
+.stage-column {
+  position: relative;
+}
+
+.offline-panel {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-top: 56.25%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 0 50px rgba(139, 123, 255, 0.12);
+  background: radial-gradient(ellipse at center, #141830 0%, #05060f 100%);
+}
+
+.offline-panel__inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.offline-panel__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(139, 123, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--text);
+}
+
+.offline-panel__text {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 34ch;
+  line-height: 1.5;
 }
 
 .chat-help {
@@ -671,10 +708,10 @@ main {
 }
 
 @media (max-width: 800px) {
-  .watch-layout.is-live {
+  .watch-layout {
     grid-template-columns: 1fr;
   }
-  .watch-layout.is-live .chat-frame {
+  .watch-layout .chat-frame {
     height: 420px;
     min-height: 0;
   }

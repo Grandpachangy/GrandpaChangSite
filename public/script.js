@@ -6,8 +6,8 @@ const parentHost = window.location.hostname || "localhost";
 const liveBanner = document.getElementById("live-banner");
 const liveTitleEl = document.getElementById("live-title");
 const liveViewersEl = document.getElementById("live-viewers");
-const watchLayout = document.getElementById("watch-layout");
 const livePlayerSection = document.getElementById("live-player-section");
+const offlinePanel = document.getElementById("offline-panel");
 const livePlayerFrame = document.getElementById("live-player");
 const liveChatFrame = document.getElementById("live-chat");
 
@@ -71,13 +71,13 @@ async function checkLive() {
       if (!isLiveEmbedded) {
         livePlayerFrame.src = `https://itzon.tv/embed/${CHANNEL}`;
         livePlayerSection.classList.remove("is-hidden");
-        watchLayout.classList.add("is-live");
+        offlinePanel.classList.add("is-hidden");
         isLiveEmbedded = true;
       }
     } else {
       liveBanner.classList.add("is-hidden");
       livePlayerSection.classList.add("is-hidden");
-      watchLayout.classList.remove("is-live");
+      offlinePanel.classList.remove("is-hidden");
       if (isLiveEmbedded) {
         livePlayerFrame.src = "about:blank";
         isLiveEmbedded = false;

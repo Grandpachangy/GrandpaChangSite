@@ -56,23 +56,31 @@
 
     <section class="watch-section">
       <div class="watch-layout" id="watch-layout">
-        <div id="live-player-section" class="is-hidden">
-          <div class="player-slot">
-            <div class="player-frame" id="player-frame">
-              <div class="player-controls">
-                <button type="button" id="sidestream-toggle" class="popout-btn popout-btn--wide" title="Open the Twitch stream in a side window">⧉ Twitch stream</button>
-                <button type="button" id="popout-toggle" class="popout-btn" title="Pop out player" aria-label="Pop out player">⤢</button>
-              </div>
-              <iframe
-                id="live-player"
-                src=""
-                allowfullscreen
-                scrolling="no"
-              ></iframe>
+        <div class="stage-column">
+          <div id="offline-panel" class="offline-panel">
+            <div class="offline-panel__inner">
+              <span class="offline-panel__mark">▶</span>
+              <p class="offline-panel__text">Offline right now — catch the next stream, or watch a recent VOD below.</p>
             </div>
-            <div id="player-placeholder" class="player-placeholder is-hidden">
-              <p>Playing in a pop-out window.</p>
-              <button type="button" id="popout-restore" class="popout-restore-btn">Bring back</button>
+          </div>
+          <div id="live-player-section" class="is-hidden">
+            <div class="player-slot">
+              <div class="player-frame" id="player-frame">
+                <div class="player-controls">
+                  <button type="button" id="sidestream-toggle" class="popout-btn popout-btn--wide" title="Open the Twitch stream in a side window">⧉ Twitch stream</button>
+                  <button type="button" id="popout-toggle" class="popout-btn" title="Pop out player" aria-label="Pop out player">⤢</button>
+                </div>
+                <iframe
+                  id="live-player"
+                  src=""
+                  allowfullscreen
+                  scrolling="no"
+                ></iframe>
+              </div>
+              <div id="player-placeholder" class="player-placeholder is-hidden">
+                <p>Playing in a pop-out window.</p>
+                <button type="button" id="popout-restore" class="popout-restore-btn">Bring back</button>
+              </div>
             </div>
           </div>
         </div>
