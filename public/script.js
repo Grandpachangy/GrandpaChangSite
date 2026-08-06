@@ -147,8 +147,10 @@ vodsGrid.addEventListener("click", (e) => {
 
 watchLayout.classList.add("chat-only");
 
+let isChatLoaded = false;
 function loadChat() {
-  if (liveChatFrame.src) return;
+  if (isChatLoaded) return;
+  isChatLoaded = true;
   liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
 }
 
