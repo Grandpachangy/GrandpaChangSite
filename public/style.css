@@ -207,23 +207,32 @@ main {
   margin: 1.5rem 0;
 }
 
+/* Default layout matches the (far more common) offline state: chat only,
+   right-aligned. JS adds .is-live for the two-column player+chat layout,
+   so there's no post-load layout flip for the common case. */
 .watch-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 1rem;
-  align-items: stretch;
-  transition: grid-template-columns 0.2s ease;
-}
-
-.watch-layout.chat-only {
   grid-template-columns: 1fr;
   max-width: 420px;
   margin: 0 0 0 auto;
+  gap: 1rem;
+  align-items: stretch;
 }
 
-.watch-layout.chat-only .chat-frame {
+.watch-layout .chat-frame {
   height: 480px;
   min-height: 0;
+}
+
+.watch-layout.is-live {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  max-width: none;
+  margin: 0;
+}
+
+.watch-layout.is-live .chat-frame {
+  height: auto;
+  min-height: 300px;
 }
 
 .player-slot {
@@ -338,10 +347,10 @@ main {
 }
 
 @media (max-width: 800px) {
-  .watch-layout {
+  .watch-layout.is-live {
     grid-template-columns: 1fr;
   }
-  .chat-frame {
+  .watch-layout.is-live .chat-frame {
     height: 420px;
     min-height: 0;
   }

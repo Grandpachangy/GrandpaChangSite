@@ -46,13 +46,13 @@ async function checkLive() {
       if (!isLiveEmbedded) {
         livePlayerFrame.src = `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=false`;
         livePlayerSection.classList.remove("is-hidden");
-        watchLayout.classList.remove("chat-only");
+        watchLayout.classList.add("is-live");
         isLiveEmbedded = true;
       }
     } else {
       liveBanner.classList.add("is-hidden");
       livePlayerSection.classList.add("is-hidden");
-      watchLayout.classList.add("chat-only");
+      watchLayout.classList.remove("is-live");
       if (isLiveEmbedded) {
         livePlayerFrame.src = "";
         isLiveEmbedded = false;
@@ -144,8 +144,6 @@ vodsGrid.addEventListener("click", (e) => {
     ></iframe>
   `;
 });
-
-watchLayout.classList.add("chat-only");
 
 let isChatLoaded = false;
 function loadChat() {
