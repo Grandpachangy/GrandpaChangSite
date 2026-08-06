@@ -85,6 +85,16 @@
     <p>Not affiliated with Twitch Interactive, Inc. Video played via Twitch's official embedded player.</p>
   </footer>
 
+  <script type="module">
+    // Import and initialize Vercel Speed Insights
+    import { injectSpeedInsights } from './speed-insights.mjs';
+    
+    // Initialize Speed Insights with default options
+    injectSpeedInsights({
+      debug: true, // Enable debug logging in development
+      sampleRate: 1 // Track 100% of page views
+    });
+  </script>
   <script src="script.js"></script>
 </body>
 </html>
