@@ -255,6 +255,22 @@ main {
   min-height: 300px;
 }
 
+.chat-help {
+  margin: 0.6rem 0 0;
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.chat-help a {
+  color: var(--accent-soft);
+  text-decoration: none;
+}
+
+.chat-help a:hover {
+  text-decoration: underline;
+}
+
 .player-slot {
   position: relative;
   width: 100%;
