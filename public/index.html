@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GrandpaChang | Live &amp; VODs</title>
+  <link rel="preconnect" href="https://itzon.tv" />
   <link rel="preconnect" href="https://player.twitch.tv" />
   <link rel="preconnect" href="https://static-cdn.jtvnw.net" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/space-grotesk-700-latin.woff2" crossorigin />
@@ -48,7 +49,7 @@
           <div class="player-slot">
             <div class="player-frame" id="player-frame">
               <div class="player-controls">
-                <button type="button" id="sidestream-toggle" class="popout-btn popout-btn--wide" title="Open the ITZon mirror in a side window">⧉ Side stream</button>
+                <button type="button" id="sidestream-toggle" class="popout-btn popout-btn--wide" title="Open the Twitch stream in a side window">⧉ Twitch stream</button>
                 <button type="button" id="popout-toggle" class="popout-btn" title="Pop out player" aria-label="Pop out player">⤢</button>
               </div>
               <iframe
@@ -78,9 +79,9 @@
       </p>
     </section>
 
-    <aside id="sidestream" class="sidestream is-hidden" aria-label="ITZon side stream">
+    <aside id="sidestream" class="sidestream is-hidden" aria-label="Twitch side stream">
       <div class="sidestream__bar">
-        <span class="sidestream__label">ITZon mirror</span>
+        <span class="sidestream__label">Twitch stream</span>
         <button type="button" id="sidestream-close" class="sidestream__close" aria-label="Close side stream">✕</button>
       </div>
       <div class="sidestream__frame">
