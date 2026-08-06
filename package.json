@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "postinstall": "cp node_modules/@vercel/speed-insights/dist/index.mjs public/speed-insights.mjs"
   },
   "devDependencies": {
     "vercel": "^37.0.0"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
   }
 }
