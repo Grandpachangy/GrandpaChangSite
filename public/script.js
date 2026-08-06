@@ -52,7 +52,7 @@ function setSidestream(open) {
   // Only hold a connection while it's actually on screen.
   sidestreamFrame.src = open
     ? `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=true`
-    : "";
+    : "about:blank";
 }
 
 sidestreamToggle.addEventListener("click", () => setSidestream(!isSidestreamOpen));
@@ -79,7 +79,7 @@ async function checkLive() {
       livePlayerSection.classList.add("is-hidden");
       watchLayout.classList.remove("is-live");
       if (isLiveEmbedded) {
-        livePlayerFrame.src = "";
+        livePlayerFrame.src = "about:blank";
         isLiveEmbedded = false;
         setPoppedOut(false);
         setSidestream(false);
@@ -128,9 +128,9 @@ async function loadVods() {
       .map(
         (vod, i) => `
       <article class="vod-card">
-        <div class="vod-card__player" data-video-id="${vod.id}">
+        <div class="vod-card__player" data-video-id="${escapeHtml(vod.id)}">
           <img
-            src="${vod.thumbnailUrl}"
+            src="${escapeHtml(vod.thumbnailUrl)}"
             alt=""
             loading="${i < 2 ? "eager" : "lazy"}"
             fetchpriority="${i < 2 ? "high" : "auto"}"
@@ -159,17 +159,23 @@ async function loadVods() {
   }
 }
 
+// Escapes quotes as well as angle brackets. The previous textContent/innerHTML
+// trick left quotes intact, which let a title containing `"` break out of an
+// attribute and inject event handlers.
 function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 vodsGrid.addEventListener("click", (e) => {
   const playerEl = e.target.closest(".vod-card__player");
   if (!playerEl || playerEl.classList.contains("is-loaded")) return;
 
-  const videoId = playerEl.dataset.videoId;
+  const videoId = encodeURIComponent(playerEl.dataset.videoId);
   playerEl.classList.add("is-loaded");
   playerEl.innerHTML = `
     <iframe

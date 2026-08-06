@@ -22,6 +22,8 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=60");
     res.status(200).json({ vods });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Log the detail server-side; don't echo upstream error bodies to clients.
+    console.error("vods endpoint failed:", err);
+    res.status(500).json({ error: "Unable to fetch VODs" });
   }
 };

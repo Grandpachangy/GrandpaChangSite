@@ -17,6 +17,8 @@ module.exports = async (req, res) => {
         : null,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Log the detail server-side; don't echo upstream error bodies to clients.
+    console.error("live endpoint failed:", err);
+    res.status(500).json({ error: "Unable to fetch live status" });
   }
 };
