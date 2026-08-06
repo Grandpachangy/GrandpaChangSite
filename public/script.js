@@ -102,13 +102,9 @@ async function loadVods() {
       .map(
         (vod) => `
       <article class="vod-card">
-        <div class="vod-card__player">
-          <iframe
-            src="https://player.twitch.tv/?video=${vod.id}&parent=${parentHost}&autoplay=false"
-            allowfullscreen
-            scrolling="no"
-            loading="lazy"
-          ></iframe>
+        <div class="vod-card__player" data-video-id="${vod.id}">
+          <img src="${vod.thumbnailUrl}" alt="" loading="lazy" />
+          <button type="button" class="vod-card__play" aria-label="Play ${escapeHtml(vod.title)}">▶</button>
         </div>
         <div class="vod-card__body">
           <p class="vod-card__title">${escapeHtml(vod.title)}</p>
@@ -133,6 +129,21 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+vodsGrid.addEventListener("click", (e) => {
+  const playerEl = e.target.closest(".vod-card__player");
+  if (!playerEl || playerEl.classList.contains("is-loaded")) return;
+
+  const videoId = playerEl.dataset.videoId;
+  playerEl.classList.add("is-loaded");
+  playerEl.innerHTML = `
+    <iframe
+      src="https://player.twitch.tv/?video=${videoId}&parent=${parentHost}&autoplay=true"
+      allowfullscreen
+      scrolling="no"
+    ></iframe>
+  `;
+});
 
 liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
 watchLayout.classList.add("chat-only");
