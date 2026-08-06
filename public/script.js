@@ -201,6 +201,16 @@ vodsNext.addEventListener("click", () => scrollVods(1));
 vodsGrid.addEventListener("scroll", updateVodsNav);
 window.addEventListener("resize", updateVodsNav);
 
+// Fall back to the gradient placeholder until an avatar file exists, so a
+// missing public/avatar.jpg degrades quietly instead of showing a broken icon.
+const aboutAvatar = document.getElementById("about-avatar");
+const aboutAvatarImg = document.getElementById("about-avatar-img");
+if (aboutAvatarImg) {
+  const markMissing = () => aboutAvatar.classList.add("has-no-image");
+  aboutAvatarImg.addEventListener("error", markMissing, { once: true });
+  if (aboutAvatarImg.complete && aboutAvatarImg.naturalWidth === 0) markMissing();
+}
+
 let isChatLoaded = false;
 function loadChat() {
   if (isChatLoaded) return;
