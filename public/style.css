@@ -203,7 +203,7 @@ main {
 }
 
 /* ---------- Live player ---------- */
-.live-player-section {
+.watch-section {
   margin: 1.5rem 0;
 }
 
@@ -212,6 +212,18 @@ main {
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 1rem;
   align-items: stretch;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.watch-layout.chat-only {
+  grid-template-columns: 1fr;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.watch-layout.chat-only .chat-frame {
+  height: 480px;
+  min-height: 0;
 }
 
 .player-slot {

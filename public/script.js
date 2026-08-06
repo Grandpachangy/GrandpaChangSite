@@ -6,6 +6,7 @@ const parentHost = window.location.hostname || "localhost";
 const liveBanner = document.getElementById("live-banner");
 const liveTitleEl = document.getElementById("live-title");
 const liveViewersEl = document.getElementById("live-viewers");
+const watchLayout = document.getElementById("watch-layout");
 const livePlayerSection = document.getElementById("live-player-section");
 const livePlayerFrame = document.getElementById("live-player");
 const liveChatFrame = document.getElementById("live-chat");
@@ -44,16 +45,16 @@ async function checkLive() {
 
       if (!isLiveEmbedded) {
         livePlayerFrame.src = `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=false`;
-        liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
         livePlayerSection.classList.remove("is-hidden");
+        watchLayout.classList.remove("chat-only");
         isLiveEmbedded = true;
       }
     } else {
       liveBanner.classList.add("is-hidden");
       livePlayerSection.classList.add("is-hidden");
+      watchLayout.classList.add("chat-only");
       if (isLiveEmbedded) {
         livePlayerFrame.src = "";
-        liveChatFrame.src = "";
         isLiveEmbedded = false;
         setPoppedOut(false);
       }
@@ -132,6 +133,9 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
+watchLayout.classList.add("chat-only");
 
 checkLive();
 loadVods();
