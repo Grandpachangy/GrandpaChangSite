@@ -788,17 +788,20 @@ main {
 }
 
 /* ---------- League of Legends status ---------- */
+/* The tab alone sits in flow, flush against the right edge; the card is
+   taken out of flow so its width can't push the tab inward while collapsed. */
 .league-widget {
   position: fixed;
   top: 50%;
   right: 0;
   transform: translateY(-50%);
   z-index: 500;
-  display: flex;
-  align-items: center;
 }
 
 .league-tab {
+  position: relative;
+  /* Above the card, so the card reads as sliding out from behind it. */
+  z-index: 2;
   width: 34px;
   height: 64px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -813,7 +816,6 @@ main {
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(6px);
   transition: color 0.15s, background 0.15s;
-  flex-shrink: 0;
 }
 
 .league-tab:hover {
@@ -826,10 +828,17 @@ main {
   transform: rotate(90deg);
 }
 
+/* Sits immediately left of the tab and out of flow, so collapsing it can't
+   shift the tab off the right edge. */
 .league-card {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  width: max-content;
   max-width: 280px;
   padding: 0.7rem 1rem 0.7rem 0.85rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -839,13 +848,20 @@ main {
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(6px);
   margin-right: -1px;
-  transition: transform 0.25s ease, opacity 0.2s ease;
+  transform: translateY(-50%);
+  /* Decelerating curve -- moves off quickly then settles, rather than the
+     linear-feeling ease. Opacity trails slightly so it fades in as it lands. */
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.26s ease 0.04s;
 }
 
+/* Tucked fully behind the tab, plus a little extra so the shadow clears too. */
 .league-card.is-collapsed {
-  transform: translateX(100%);
+  transform: translateY(-50%) translateX(calc(100% + 12px));
   opacity: 0;
   pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.5, 0, 0.75, 0),
+    opacity 0.18s ease;
 }
 
 .league-dot {
@@ -901,6 +917,22 @@ main {
 @media (max-width: 640px) {
   .league-card {
     max-width: min(240px, 62vw);
+  }
+  .league-tab {
+    width: 28px;
+    height: 56px;
+  }
+}
+
+/* Snap between states rather than sliding, but keep the tab and the
+   card's vertical centring intact. */
+@media (prefers-reduced-motion: reduce) {
+  .league-card,
+  .league-card.is-collapsed {
+    transition: none;
+  }
+  .league-card.is-in-game .league-dot {
+    animation: none;
   }
 }
 
