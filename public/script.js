@@ -307,12 +307,23 @@ if (aboutAvatarImg) {
 
 // Now playing, via Last.fm. Hidden entirely unless a track is actually
 // playing, so it stays out of the way when there's nothing to show.
-const NOWPLAYING_POLL_MS = 30 * 1000;
+const NOWPLAYING_POLL_MS = 10 * 1000;
 const nowPlayingEl = document.getElementById("nowplaying");
 const npArt = document.getElementById("np-art");
 const npTitle = document.getElementById("np-title");
 const npArtist = document.getElementById("np-artist");
 let nowPlayingTimer = null;
+let nowPlayingStopped = false;
+
+function startNowPlayingPolling() {
+  if (nowPlayingStopped || nowPlayingTimer) return;
+  nowPlayingTimer = setInterval(checkNowPlaying, NOWPLAYING_POLL_MS);
+}
+
+function stopNowPlayingPolling() {
+  clearInterval(nowPlayingTimer);
+  nowPlayingTimer = null;
+}
 
 async function checkNowPlaying() {
   try {
@@ -322,7 +333,8 @@ async function checkNowPlaying() {
     // Credentials not set yet: stop polling rather than hammering the endpoint.
     if (data.configured === false) {
       nowPlayingEl.classList.add("is-hidden");
-      clearInterval(nowPlayingTimer);
+      nowPlayingStopped = true;
+      stopNowPlayingPolling();
       return;
     }
 
@@ -367,4 +379,15 @@ checkLive();
 loadVods();
 checkNowPlaying();
 setInterval(checkLive, LIVE_POLL_MS);
-nowPlayingTimer = setInterval(checkNowPlaying, NOWPLAYING_POLL_MS);
+startNowPlayingPolling();
+
+// Only poll while the tab is actually being looked at, and refresh the moment
+// it comes back so the card is current rather than up to one interval stale.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopNowPlayingPolling();
+  } else {
+    checkNowPlaying();
+    startNowPlayingPolling();
+  }
+});

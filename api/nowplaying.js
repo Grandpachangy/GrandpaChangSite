@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
     );
 
     if (!isNowPlaying) {
-      res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
+      res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
       res.status(200).json({ configured: true, playing: false });
       return;
     }
@@ -51,7 +51,9 @@ module.exports = async (req, res) => {
       {};
     const art = typeof preferred["#text"] === "string" ? preferred["#text"] : "";
 
-    res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
+    // Short edge cache: keeps the widget responsive while still absorbing
+    // per-visitor polling so Last.fm sees roughly one request per window.
+    res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
     res.status(200).json({
       configured: true,
       playing: true,
