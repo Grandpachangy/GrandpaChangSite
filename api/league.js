@@ -185,6 +185,36 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Diagnostic step 4: Riot's gateway answers 403 for unknown/malformed
+  // routes, not 404 -- so a wrong path is indistinguishable from a
+  // permissions failure. The portal's tester builds the URL itself and got
+  // 404 (valid, nobody in game), which points at our path being wrong
+  // rather than the key. This probes every plausible variant at once; the
+  // one that answers 404 is the correct route.
+  if (req.query && req.query.diag === "4") {
+    const puuid =
+      "haj42q43QALcHAo0xJONjvcIqPI-FSjTSxrMU0qfc_z1UfnrMsqESfkz5O7_0sbBDwe6d8lV2A-0Ug";
+    const base = "https://euw1.api.riotgames.com";
+    const candidates = [
+      ["v5 by-summoner", `${base}/lol/spectator/v5/active-games/by-summoner/${puuid}`],
+      ["v5 by-puuid", `${base}/lol/spectator/v5/active-games/by-puuid/${puuid}`],
+      ["v4 by-summoner", `${base}/lol/spectator/v4/active-games/by-summoner/${puuid}`],
+    ];
+
+    const results = [];
+    for (const [label, url] of candidates) {
+      try {
+        const r = await fetch(url, { headers: { "X-Riot-Token": apiKey } });
+        const bodyText = await r.text();
+        results.push({ label, status: r.status, body: bodyText.slice(0, 200) });
+      } catch (err) {
+        results.push({ label, threw: err.message });
+      }
+    }
+    res.status(200).json({ results });
+    return;
+  }
+
   try {
     // Stop at the first account found in a game -- normally at most one is,
     // so this usually costs far fewer calls than checking all of them. Track
