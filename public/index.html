@@ -32,14 +32,16 @@
       <span class="brand-mark">✦</span>
       <span class="brand-name">GrandpaChang</span>
     </div>
-    <div class="header-links">
+    <nav class="header-links" aria-label="Primary">
+      <a class="twitch-link" href="#about">About</a>
+      <a class="twitch-link" href="#socials">Socials</a>
       <a class="twitch-link" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">
-        twitch.tv/grandpachang
+        Twitch ↗
       </a>
       <a class="twitch-link" href="https://itzon.tv/grandpachang" target="_blank" rel="noopener">
-        itzon.tv/grandpachang
+        ITZon ↗
       </a>
-    </div>
+    </nav>
   </header>
 
   <main>
@@ -77,6 +79,12 @@
                   allowfullscreen
                   scrolling="no"
                 ></iframe>
+                <!-- Double-click-to-fullscreen zones. The iframe is
+                     cross-origin so it swallows its own clicks; these sit above
+                     it, but deliberately leave itzon's Unmute button
+                     (bottom-right) uncovered. -->
+                <div class="player-dblzone player-dblzone--main"></div>
+                <div class="player-dblzone player-dblzone--strip"></div>
                 <p id="player-note" class="player-note is-hidden" role="status"></p>
               </div>
               <div id="player-placeholder" class="player-placeholder is-hidden">
@@ -179,6 +187,12 @@
         </a>
         <a class="social-link" href="https://itzon.tv/grandpachang" target="_blank" rel="noopener">
           <span class="social-link__mark">✦</span>ITZon
+        </a>
+        <a class="social-link" href="https://x.com/changgrandpa" target="_blank" rel="noopener">
+          <span class="social-link__mark">✕</span>X
+        </a>
+        <a class="social-link" href="https://www.tiktok.com/@changstreams" target="_blank" rel="noopener">
+          <span class="social-link__mark">♪</span>TikTok
         </a>
       </div>
     </section>

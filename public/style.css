@@ -571,6 +571,28 @@ main {
   border-color: var(--accent-soft);
 }
 
+/* Sit above the iframe (which has no z-index) but below .player-controls
+   (z-index 5). Together they cover the frame except the bottom-right corner,
+   where itzon's own Unmute button lives. */
+.player-dblzone {
+  position: absolute;
+  z-index: 2;
+}
+
+.player-dblzone--main {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+}
+
+.player-dblzone--strip {
+  left: 0;
+  right: 156px;
+  bottom: 0;
+  height: 64px;
+}
+
 /* Surfaces a failed fullscreen request, which is otherwise invisible. */
 .player-note {
   position: absolute;

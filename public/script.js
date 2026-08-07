@@ -100,7 +100,7 @@ async function enterFullscreen() {
   return false;
 }
 
-fullscreenToggle.addEventListener("click", () => {
+function toggleFullscreen() {
   if (currentFullscreenEl()) {
     exitFullscreen();
     return;
@@ -108,6 +108,13 @@ fullscreenToggle.addEventListener("click", () => {
   // Fullscreen always goes from the docked frame, never the floating one.
   if (isPoppedOut) setPoppedOut(false);
   enterFullscreen();
+}
+
+fullscreenToggle.addEventListener("click", toggleFullscreen);
+
+// Double-click the video to toggle fullscreen, as most video players do.
+document.querySelectorAll(".player-dblzone").forEach((zone) => {
+  zone.addEventListener("dblclick", toggleFullscreen);
 });
 
 document.addEventListener("fullscreenchange", syncFullscreenButton);
