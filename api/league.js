@@ -123,6 +123,22 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Temporary diagnostic: every real Riot key looks like RGAPI-<uuid>, with
+  // no surrounding whitespace. This checks the shape without ever exposing
+  // the value itself, to catch a stray newline/space/quote from copy-paste
+  // into Vercel's env var field -- an invisible but complete auth-breaker.
+  if (req.query && req.query.diag === "1") {
+    res.status(200).json({
+      length: apiKey.length,
+      trimmedLength: apiKey.trim().length,
+      hasWhitespace: apiKey !== apiKey.trim(),
+      startsWithRGAPI: apiKey.startsWith("RGAPI-"),
+      firstChar: JSON.stringify(apiKey[0]),
+      lastChar: JSON.stringify(apiKey[apiKey.length - 1]),
+    });
+    return;
+  }
+
   try {
     // Stop at the first account found in a game -- normally at most one is,
     // so this usually costs far fewer calls than checking all of them. Track
