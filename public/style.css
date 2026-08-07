@@ -671,8 +671,10 @@ main {
   max-width: min(340px, 90vw);
   padding: 0.55rem 0.9rem 0.55rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid var(--card-border);
-  background: rgba(5, 6, 15, 0.92);
+  /* One step up from the page background so the card reads as a distinct
+     surface, while staying firmly in the dark palette. */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 21, 44, 0.94);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
 }
