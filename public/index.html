@@ -140,12 +140,32 @@
         <span class="league-tab__icon">⚔</span>
       </button>
       <aside id="league-card" class="league-card is-collapsed" aria-label="League of Legends status">
-        <span id="league-dot" class="league-dot"></span>
-        <img id="league-icon" class="league-icon is-hidden" alt="" width="36" height="36" />
-        <span class="league-meta">
+        <div class="league-head">
+          <span id="league-dot" class="league-dot"></span>
           <span id="league-status" class="league-status">Not currently in game</span>
-          <span id="league-detail" class="league-detail"></span>
-        </span>
+          <span id="league-timer" class="league-timer"></span>
+        </div>
+
+        <div id="league-main" class="league-main is-hidden">
+          <div class="league-champblock">
+            <img id="league-icon" class="league-icon" alt="" width="48" height="48" />
+            <div id="league-spells" class="league-spells"></div>
+          </div>
+          <div class="league-info">
+            <span id="league-detail" class="league-detail"></span>
+            <span id="league-side" class="league-side"></span>
+          </div>
+        </div>
+
+        <div id="league-matchup" class="league-section is-hidden">
+          <span class="league-label" id="league-matchup-label">Matchup</span>
+          <div id="league-matchup-body" class="league-iconrow"></div>
+        </div>
+
+        <div id="league-bans" class="league-section is-hidden">
+          <span class="league-label">Bans</span>
+          <div id="league-bans-body" class="league-iconrow"></div>
+        </div>
       </aside>
     </div>
 

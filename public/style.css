@@ -836,11 +836,12 @@ main {
   top: 50%;
   z-index: 1;
   display: flex;
-  align-items: center;
-  gap: 0.65rem;
+  flex-direction: column;
+  gap: 0.6rem;
   width: max-content;
-  max-width: 280px;
-  padding: 0.7rem 1rem 0.7rem 0.85rem;
+  min-width: 210px;
+  max-width: 300px;
+  padding: 0.8rem 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-right: none;
   border-radius: 12px 0 0 12px;
@@ -883,18 +884,10 @@ main {
   100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0); }
 }
 
-.league-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  flex-shrink: 0;
-  object-fit: cover;
-}
-
-.league-meta {
+.league-head {
   display: flex;
-  flex-direction: column;
-  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .league-status {
@@ -904,15 +897,122 @@ main {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.league-detail {
+/* Tabular figures stop the clock jittering as the digits change. */
+.league-timer {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.league-main {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.league-champblock {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.league-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.league-spells {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.league-spells img {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: block;
+}
+
+.league-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.league-detail,
+.league-side {
   font-size: 0.75rem;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.league-side--blue { color: #7fb2ff; }
+.league-side--red { color: #ff8f8f; }
+
+.league-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.league-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.league-iconrow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.league-iconrow img {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  display: block;
+}
+
+/* The player's own champion in a matchup pairing, to anchor the "vs". */
+.league-iconrow .league-vs {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin: 0 0.1rem;
+}
+
+/* Bans are context, not the headline -- dimmed until hovered. */
+.league-bansrow img {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.league-bansrow:hover img {
+  opacity: 0.9;
+}
+
+/* Win/loss colouring for the post-game state. */
+.league-card.is-win .league-dot { background: #3ddc84; }
+.league-card.is-loss .league-dot { background: var(--live-red); }
+.league-card.is-win .league-status { color: #6ee7a8; }
+.league-card.is-loss .league-status { color: #ff8f8f; }
 
 @media (max-width: 640px) {
   .league-card {

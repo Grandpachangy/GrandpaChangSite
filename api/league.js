@@ -1,11 +1,14 @@
-// Reports whether any of the configured League accounts is currently in a
-// game, and which champion is being played.
+// Reports League status for a set of accounts, in three states:
+//   in game      -- champion, timer, spells, matchup, side, bans
+//   post-game    -- result + KDA, for 5 minutes after a match ends
+//   idle         -- nothing playing
 //
-// Two Riot APIs are involved:
+// APIs involved:
 //   Account-V1   (regional cluster) -- Riot ID -> PUUID, cached indefinitely
 //   Spectator-V5 (platform routing) -- PUUID -> active game, 404 when not in one
-// Champion id -> name/icon comes from Data Dragon, which is static and needs
-// no key.
+//   Match-V5     (regional cluster) -- last finished match, for the post-game card
+// Champion/spell names and icons come from Data Dragon, which is static and
+// needs no key.
 
 const ACCOUNTS = [
   { gameName: "Vita Nihil", tagLine: "Empty", platform: "eun1" },
@@ -18,8 +21,13 @@ const ACCOUNTS = [
   { gameName: "ere", tagLine: "mrm", platform: "euw1" },
 ];
 
-// EUW and EUNE both resolve Riot IDs through the europe cluster.
+// EUW and EUNE both route through the europe cluster for Account-V1/Match-V5.
 const ACCOUNT_CLUSTER = "europe";
+
+// How long after a match ends to keep showing the result.
+const POSTGAME_WINDOW_MS = 5 * 60 * 1000;
+// How long to keep checking match history after last seeing someone in a game.
+const POSTGAME_LOOKUP_WINDOW_MS = 12 * 60 * 1000;
 
 const QUEUE_NAMES = {
   400: "Normal Draft",
@@ -33,14 +41,28 @@ const QUEUE_NAMES = {
   1900: "URF",
 };
 
-// PUUIDs are stable, so resolve each Riot ID once per warm instance.
 const puuidCache = new Map();
 
-// Which account was last found in a game. Checked first on the next sweep:
-// while a game is running that turns an 8-call sweep into a 1-call hit,
-// which matters because the Riot personal-key budget (~50 req/min) is the
-// binding constraint on how fast this endpoint can poll.
+// Which account was last found in a game, and when. Checked first on the next
+// sweep: while a game runs that turns an 8-call sweep into a 1-call hit, which
+// matters because the personal-key budget (~50 req/min) is the binding
+// constraint. The timestamp also scopes post-game lookups so match history
+// isn't queried when nobody has played recently.
 let lastActiveKey = null;
+let lastActiveSeenAt = 0;
+
+// Post-game results are re-read at most this often, rather than every sweep.
+let postGameCache = null;
+let postGameCachedAt = 0;
+const POSTGAME_CACHE_MS = 45 * 1000;
+
+let staticCache = null;
+let staticCachedAt = 0;
+const STATIC_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function riotFetch(url, apiKey) {
+  return fetch(url, { headers: { "X-Riot-Token": apiKey } });
+}
 
 function accountsByPriority() {
   if (!lastActiveKey) return ACCOUNTS;
@@ -50,41 +72,61 @@ function accountsByPriority() {
   if (idx <= 0) return ACCOUNTS;
   return [ACCOUNTS[idx], ...ACCOUNTS.slice(0, idx), ...ACCOUNTS.slice(idx + 1)];
 }
-let championsCache = null;
-let championsCachedAt = 0;
-const CHAMPIONS_TTL_MS = 24 * 60 * 60 * 1000;
 
-async function riotFetch(url, apiKey) {
-  return fetch(url, { headers: { "X-Riot-Token": apiKey } });
-}
-
-async function getChampionIndex() {
+// Champion and summoner-spell lookup tables, keyed by the numeric ids the
+// game APIs return.
+async function getStaticIndex() {
   const now = Date.now();
-  if (championsCache && now - championsCachedAt < CHAMPIONS_TTL_MS) {
-    return championsCache;
-  }
+  if (staticCache && now - staticCachedAt < STATIC_TTL_MS) return staticCache;
 
   const versionsRes = await fetch("https://ddragon.leagueoflegends.com/api/versions.json");
   if (!versionsRes.ok) throw new Error("Data Dragon versions fetch failed");
-  const versions = await versionsRes.json();
-  const version = versions[0];
+  const version = (await versionsRes.json())[0];
 
-  const champRes = await fetch(
-    `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`
-  );
+  const [champRes, spellRes] = await Promise.all([
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`),
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/summoner.json`),
+  ]);
   if (!champRes.ok) throw new Error("Data Dragon champion fetch failed");
-  const champJson = await champRes.json();
+  if (!spellRes.ok) throw new Error("Data Dragon summoner fetch failed");
 
-  // Data Dragon keys by champion name; we need numeric id -> { name, slug }.
-  const byId = new Map();
+  const champJson = await champRes.json();
+  const spellJson = await spellRes.json();
+
+  const championsById = new Map();
   for (const slug of Object.keys(champJson.data || {})) {
     const c = champJson.data[slug];
-    byId.set(String(c.key), { name: c.name, slug: c.id });
+    championsById.set(String(c.key), { name: c.name, slug: c.id });
   }
 
-  championsCache = { version, byId };
-  championsCachedAt = now;
-  return championsCache;
+  const spellsById = new Map();
+  for (const slug of Object.keys(spellJson.data || {})) {
+    const s = spellJson.data[slug];
+    spellsById.set(String(s.key), { name: s.name, slug: s.id });
+  }
+
+  staticCache = { version, championsById, spellsById };
+  staticCachedAt = now;
+  return staticCache;
+}
+
+function championPayload(idx, championId) {
+  const champ = idx.championsById.get(String(championId));
+  return {
+    name: champ ? champ.name : `Champion ${championId}`,
+    icon: champ
+      ? `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/champion/${champ.slug}.png`
+      : null,
+  };
+}
+
+function spellPayload(idx, spellId) {
+  const spell = idx.spellsById.get(String(spellId));
+  if (!spell) return null;
+  return {
+    name: spell.name,
+    icon: `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/spell/${spell.slug}.png`,
+  };
 }
 
 async function getPuuid(account, apiKey) {
@@ -97,7 +139,6 @@ async function getPuuid(account, apiKey) {
 
   const res = await riotFetch(url, apiKey);
   if (!res.ok) {
-    // Don't cache failures -- a bad key or transient error shouldn't stick.
     const err = new Error(`Account lookup failed for ${key}: ${res.status}`);
     err.status = res.status;
     throw err;
@@ -119,8 +160,6 @@ async function getActiveGame(account, apiKey) {
     encodeURIComponent(puuid);
 
   const res = await riotFetch(url, apiKey);
-
-  // 404 is the normal "not currently in a game" answer.
   if (res.status === 404) return null;
   if (!res.ok) {
     const err = new Error(`Spectator failed for ${account.platform}: ${res.status}`);
@@ -130,7 +169,61 @@ async function getActiveGame(account, apiKey) {
 
   const game = await res.json();
   const me = (game.participants || []).find((p) => p.puuid === puuid);
-  return { game, me };
+  return { game, me, puuid };
+}
+
+// Most recent finished match, if it ended inside the post-game window.
+async function getPostGame(account, apiKey) {
+  const now = Date.now();
+  if (postGameCache && now - postGameCachedAt < POSTGAME_CACHE_MS) {
+    return postGameCache;
+  }
+
+  const puuid = await getPuuid(account, apiKey);
+  const idsUrl =
+    `https://${ACCOUNT_CLUSTER}.api.riotgames.com/lol/match/v5/matches/by-puuid/` +
+    `${encodeURIComponent(puuid)}/ids?start=0&count=1`;
+
+  const idsRes = await riotFetch(idsUrl, apiKey);
+  if (!idsRes.ok) return null;
+  const ids = await idsRes.json();
+  if (!Array.isArray(ids) || !ids.length) return null;
+
+  const matchRes = await riotFetch(
+    `https://${ACCOUNT_CLUSTER}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(ids[0])}`,
+    apiKey
+  );
+  if (!matchRes.ok) return null;
+
+  const match = await matchRes.json();
+  const info = match.info || {};
+  const endedAt = info.gameEndTimestamp || 0;
+  if (!endedAt || now - endedAt > POSTGAME_WINDOW_MS) {
+    postGameCache = null;
+    postGameCachedAt = now;
+    return null;
+  }
+
+  const me = (info.participants || []).find((p) => p.puuid === puuid);
+  if (!me) return null;
+
+  const idx = await getStaticIndex();
+  const result = {
+    account: `${account.gameName}#${account.tagLine}`,
+    champion: championPayload(idx, me.championId),
+    win: Boolean(me.win),
+    kills: me.kills ?? 0,
+    deaths: me.deaths ?? 0,
+    assists: me.assists ?? 0,
+    cs: (me.totalMinionsKilled ?? 0) + (me.neutralMinionsKilled ?? 0),
+    queue: QUEUE_NAMES[info.queueId] || info.gameMode || "Custom",
+    durationSec: info.gameDuration ?? null,
+    endedAt,
+  };
+
+  postGameCache = result;
+  postGameCachedAt = now;
+  return result;
 }
 
 module.exports = async (req, res) => {
@@ -138,16 +231,11 @@ module.exports = async (req, res) => {
 
   if (!apiKey) {
     res.setHeader("Cache-Control", "s-maxage=60");
-    res.status(200).json({ configured: false, inGame: false });
+    res.status(200).json({ configured: false, state: "idle" });
     return;
   }
 
   try {
-    // Stop at the first account found in a game -- normally at most one is,
-    // so this usually costs far fewer calls than checking all of them. Track
-    // outcomes so a completely broken key (every account 401/403) can be
-    // told apart from a working key that genuinely finds nobody in a game --
-    // both would otherwise produce an identical inGame:false response.
     let checkedOk = 0;
     let authFailures = 0;
 
@@ -157,7 +245,6 @@ module.exports = async (req, res) => {
         result = await getActiveGame(account, apiKey);
         checkedOk++;
       } catch (err) {
-        // One bad account shouldn't take down the whole widget.
         if (err.status === 401 || err.status === 403) authFailures++;
         console.error("league: account check failed:", err.message);
         continue;
@@ -165,46 +252,90 @@ module.exports = async (req, res) => {
       if (!result || !result.me) continue;
 
       const { game, me } = result;
-      const champions = await getChampionIndex();
-      const champ = champions.byId.get(String(me.championId));
+      const idx = await getStaticIndex();
       lastActiveKey = `${account.gameName}#${account.tagLine}`;
+      lastActiveSeenAt = Date.now();
+      // A new game invalidates any cached post-game result.
+      postGameCache = null;
 
-      // No stale-while-revalidate here: serving a deliberately stale answer
-      // is the wrong trade for "am I in a game right now".
+      const myTeam = me.teamId;
+      const allies = (game.participants || []).filter((p) => p.teamId === myTeam);
+      const enemies = (game.participants || []).filter((p) => p.teamId !== myTeam);
+
+      // Riot returns participants in champ-select order, which usually lines
+      // up by role between teams -- so the same index on the other team is
+      // the likely lane opponent. It's a heuristic, not authoritative, and it
+      // breaks down in blind pick and ARAM.
+      const myIndex = allies.findIndex((p) => p.puuid === me.puuid);
+      const opponent = myIndex >= 0 && enemies[myIndex] ? enemies[myIndex] : null;
+
       res.setHeader("Cache-Control", "s-maxage=15");
       res.status(200).json({
         configured: true,
-        inGame: true,
+        keyValid: true,
+        state: "in-game",
         account: `${account.gameName}#${account.tagLine}`,
         region: account.platform === "eun1" ? "EUNE" : "EUW",
-        champion: champ ? champ.name : `Champion ${me.championId}`,
-        championIcon: champ
-          ? `https://ddragon.leagueoflegends.com/cdn/${champions.version}/img/champion/${champ.slug}.png`
-          : null,
+        champion: championPayload(idx, me.championId),
         queue: QUEUE_NAMES[game.gameQueueConfigId] || game.gameMode || "Custom",
         gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
+        side: myTeam === 100 ? "Blue" : "Red",
+        spells: [spellPayload(idx, me.spell1Id), spellPayload(idx, me.spell2Id)].filter(Boolean),
+        opponent: opponent ? championPayload(idx, opponent.championId) : null,
+        opponentInferred: Boolean(opponent),
+        enemyTeam: enemies.map((p) => championPayload(idx, p.championId)),
+        bans: (game.bannedChampions || [])
+          .filter((b) => b.championId > 0)
+          .map((b) => championPayload(idx, b.championId)),
       });
       return;
     }
 
-    // Every single account failed auth: the key is set but not actually
-    // valid (revoked, malformed, wrong region). Surfaced as a distinct
-    // response rather than a silent "not in game" -- the widget itself still
-    // only branches on inGame, but this is visible to anyone checking the
-    // endpoint directly, and it's what to check first if the widget never
-    // lights up despite the account genuinely being in a game.
     if (checkedOk === 0 && authFailures === ACCOUNTS.length) {
       console.error("league: all accounts failed auth -- RIOT_API_KEY is set but invalid");
       res.setHeader("Cache-Control", "s-maxage=20");
-      res.status(200).json({ configured: true, keyValid: false, inGame: false });
+      res.status(200).json({ configured: true, keyValid: false, state: "idle" });
       return;
     }
 
-    // Nobody in a game: clear the priority hint so the next sweep doesn't
-    // keep favouring an account that's since finished playing.
-    lastActiveKey = null;
+    // Nobody in a game. If someone was playing recently, check whether their
+    // match just finished so the post-game card can take over.
+    if (lastActiveKey && Date.now() - lastActiveSeenAt < POSTGAME_LOOKUP_WINDOW_MS) {
+      const account = ACCOUNTS.find(
+        (a) => `${a.gameName}#${a.tagLine}` === lastActiveKey
+      );
+      if (account) {
+        try {
+          const post = await getPostGame(account, apiKey);
+          if (post) {
+            res.setHeader("Cache-Control", "s-maxage=15");
+            res.status(200).json({
+              configured: true,
+              keyValid: true,
+              state: "post-game",
+              ...post,
+            });
+            return;
+          }
+        } catch (err) {
+          console.error("league: post-game lookup failed:", err.message);
+        }
+      }
+    }
+
+    // Past the window with nothing playing: drop the hint so later sweeps
+    // don't keep favouring a stale account or re-querying match history.
+    if (lastActiveKey && Date.now() - lastActiveSeenAt >= POSTGAME_LOOKUP_WINDOW_MS) {
+      lastActiveKey = null;
+    }
+
     res.setHeader("Cache-Control", "s-maxage=15");
-    res.status(200).json({ configured: true, keyValid: true, inGame: false, checkedAccounts: checkedOk });
+    res.status(200).json({
+      configured: true,
+      keyValid: true,
+      state: "idle",
+      checkedAccounts: checkedOk,
+    });
   } catch (err) {
     console.error("league endpoint failed:", err);
     res.status(500).json({ error: "Unable to fetch League status" });

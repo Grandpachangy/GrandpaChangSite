@@ -396,11 +396,68 @@ const leagueCard = document.getElementById("league-card");
 const leagueIcon = document.getElementById("league-icon");
 const leagueStatus = document.getElementById("league-status");
 const leagueDetail = document.getElementById("league-detail");
+const leagueTimerEl = document.getElementById("league-timer");
+const leagueMain = document.getElementById("league-main");
+const leagueSpells = document.getElementById("league-spells");
+const leagueSide = document.getElementById("league-side");
+const leagueMatchup = document.getElementById("league-matchup");
+const leagueMatchupLabel = document.getElementById("league-matchup-label");
+const leagueMatchupBody = document.getElementById("league-matchup-body");
+const leagueBans = document.getElementById("league-bans");
+const leagueBansBody = document.getElementById("league-bans-body");
 
 let leagueOpen = false;
-let leagueWasInGame = false;
+let leagueLastState = "idle";
 let leagueTimer = null;
 let leagueStopped = false;
+
+// Game clock. The API reports elapsed seconds at fetch time; this ticks it
+// locally between polls so the timer moves every second rather than jumping
+// in 10s steps.
+let gameClockBaseSec = null;
+let gameClockSyncedAt = 0;
+let gameClockTicker = null;
+
+function formatClock(totalSec) {
+  const s = Math.max(0, Math.floor(totalSec));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function renderClock() {
+  if (gameClockBaseSec === null) {
+    leagueTimerEl.textContent = "";
+    return;
+  }
+  const elapsed = gameClockBaseSec + (Date.now() - gameClockSyncedAt) / 1000;
+  leagueTimerEl.textContent = formatClock(elapsed);
+}
+
+function startGameClock(baseSec) {
+  gameClockBaseSec = baseSec;
+  gameClockSyncedAt = Date.now();
+  renderClock();
+  if (!gameClockTicker) gameClockTicker = setInterval(renderClock, 1000);
+}
+
+function stopGameClock() {
+  clearInterval(gameClockTicker);
+  gameClockTicker = null;
+  gameClockBaseSec = null;
+  leagueTimerEl.textContent = "";
+}
+
+// Builds an <img> without innerHTML, so Riot-supplied names never touch
+// markup parsing.
+function championImg(champ, cls) {
+  const img = document.createElement("img");
+  img.src = champ.icon || "";
+  img.alt = champ.name || "";
+  img.title = champ.name || "";
+  img.loading = "lazy";
+  if (cls) img.className = cls;
+  return img;
+}
 
 function setLeagueOpen(open) {
   leagueOpen = open;
@@ -434,36 +491,140 @@ async function checkLeague() {
 
     leagueWidget.classList.remove("is-hidden");
 
-    if (data.inGame) {
-      leagueCard.classList.add("is-in-game");
-      // textContent: champion/account/queue values come from Riot's API.
-      leagueStatus.textContent = `Playing ${data.champion || "a champion"}`;
-      leagueDetail.textContent = [data.account, data.queue].filter(Boolean).join(" · ");
+    const state = data.state || "idle";
+    leagueCard.classList.toggle("is-in-game", state === "in-game");
+    leagueCard.classList.toggle("is-win", state === "post-game" && data.win === true);
+    leagueCard.classList.toggle("is-loss", state === "post-game" && data.win === false);
 
-      if (data.championIcon) {
-        leagueIcon.src = data.championIcon;
-        leagueIcon.alt = data.champion || "";
-        leagueIcon.classList.remove("is-hidden");
-      } else {
-        leagueIcon.removeAttribute("src");
-        leagueIcon.classList.add("is-hidden");
-      }
-
-      // Auto-open the moment a game starts; leave later manual toggles alone
-      // for the rest of that game.
-      if (!leagueWasInGame) setLeagueOpen(true);
-      leagueWasInGame = true;
+    if (state === "in-game") {
+      renderInGame(data);
+    } else if (state === "post-game") {
+      renderPostGame(data);
     } else {
-      leagueCard.classList.remove("is-in-game");
-      leagueStatus.textContent = "Not currently in game";
-      leagueDetail.textContent = "";
-      leagueIcon.removeAttribute("src");
-      leagueIcon.classList.add("is-hidden");
-      leagueWasInGame = false;
+      renderIdle();
     }
+
+    // Auto-open on entering a game and again when the result lands, since
+    // both are moments worth surfacing. Manual toggles within a state are
+    // left alone.
+    if (state !== leagueLastState && (state === "in-game" || state === "post-game")) {
+      setLeagueOpen(true);
+    }
+    leagueLastState = state;
   } catch (err) {
     console.error("League check failed:", err);
   }
+}
+
+function renderInGame(data) {
+  // textContent throughout: every value here is third-party data.
+  leagueStatus.textContent = `Playing ${data.champion ? data.champion.name : "a champion"}`;
+  leagueDetail.textContent = [data.account, data.queue].filter(Boolean).join(" · ");
+
+  leagueSide.textContent = data.side ? `${data.side} side` : "";
+  leagueSide.className =
+    "league-side" + (data.side ? ` league-side--${data.side.toLowerCase()}` : "");
+
+  if (data.champion && data.champion.icon) {
+    leagueIcon.src = data.champion.icon;
+    leagueIcon.alt = data.champion.name || "";
+    leagueIcon.classList.remove("is-hidden");
+  } else {
+    leagueIcon.removeAttribute("src");
+    leagueIcon.classList.add("is-hidden");
+  }
+
+  leagueSpells.replaceChildren();
+  for (const spell of data.spells || []) {
+    const img = document.createElement("img");
+    img.src = spell.icon;
+    img.alt = spell.name;
+    img.title = spell.name;
+    img.loading = "lazy";
+    leagueSpells.appendChild(img);
+  }
+
+  leagueMain.classList.remove("is-hidden");
+
+  // Matchup: the opponent pairing is inferred from champ-select order, so
+  // fall back to showing the whole enemy team when there's no pairing.
+  leagueMatchupBody.replaceChildren();
+  if (data.opponent) {
+    leagueMatchupLabel.textContent = "Likely matchup";
+    if (data.champion) leagueMatchupBody.appendChild(championImg(data.champion));
+    const vs = document.createElement("span");
+    vs.className = "league-vs";
+    vs.textContent = "vs";
+    leagueMatchupBody.appendChild(vs);
+    leagueMatchupBody.appendChild(championImg(data.opponent));
+    leagueMatchup.classList.remove("is-hidden");
+  } else if ((data.enemyTeam || []).length) {
+    leagueMatchupLabel.textContent = "Enemy team";
+    for (const c of data.enemyTeam) leagueMatchupBody.appendChild(championImg(c));
+    leagueMatchup.classList.remove("is-hidden");
+  } else {
+    leagueMatchup.classList.add("is-hidden");
+  }
+
+  leagueBansBody.replaceChildren();
+  if ((data.bans || []).length) {
+    leagueBansBody.className = "league-iconrow league-bansrow";
+    for (const c of data.bans) leagueBansBody.appendChild(championImg(c));
+    leagueBans.classList.remove("is-hidden");
+  } else {
+    leagueBans.classList.add("is-hidden");
+  }
+
+  if (typeof data.gameLengthSec === "number") {
+    startGameClock(data.gameLengthSec);
+  } else {
+    stopGameClock();
+  }
+}
+
+function renderPostGame(data) {
+  stopGameClock();
+
+  leagueStatus.textContent = data.win ? "Victory" : "Defeat";
+  leagueTimerEl.textContent =
+    typeof data.durationSec === "number" ? formatClock(data.durationSec) : "";
+
+  const kda = `${data.kills}/${data.deaths}/${data.assists}`;
+  leagueDetail.textContent = `${data.champion ? data.champion.name : ""} · ${kda}`.trim();
+  leagueSide.className = "league-side";
+  leagueSide.textContent = [
+    data.queue,
+    typeof data.cs === "number" ? `${data.cs} CS` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  if (data.champion && data.champion.icon) {
+    leagueIcon.src = data.champion.icon;
+    leagueIcon.alt = data.champion.name || "";
+    leagueIcon.classList.remove("is-hidden");
+  } else {
+    leagueIcon.removeAttribute("src");
+    leagueIcon.classList.add("is-hidden");
+  }
+
+  leagueSpells.replaceChildren();
+  leagueMain.classList.remove("is-hidden");
+  leagueMatchup.classList.add("is-hidden");
+  leagueBans.classList.add("is-hidden");
+}
+
+function renderIdle() {
+  stopGameClock();
+  leagueStatus.textContent = "Not currently in game";
+  leagueDetail.textContent = "";
+  leagueSide.textContent = "";
+  leagueSide.className = "league-side";
+  leagueIcon.removeAttribute("src");
+  leagueSpells.replaceChildren();
+  leagueMain.classList.add("is-hidden");
+  leagueMatchup.classList.add("is-hidden");
+  leagueBans.classList.add("is-hidden");
 }
 
 let isChatLoaded = false;
