@@ -95,8 +95,12 @@ async function getPuuid(account, apiKey) {
 
 async function getActiveGame(account, apiKey) {
   const puuid = await getPuuid(account, apiKey);
+  // Spectator-V5 kept the `by-summoner` path segment from v4 even though it
+  // now takes a PUUID. `by-puuid` is not a real route -- and Riot answers
+  // unknown routes with 403, which is indistinguishable from a permissions
+  // failure, so getting this wrong is silently misleading.
   const url =
-    `https://${account.platform}.api.riotgames.com/lol/spectator/v5/active-games/by-puuid/` +
+    `https://${account.platform}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/` +
     encodeURIComponent(puuid);
 
   const res = await riotFetch(url, apiKey);
