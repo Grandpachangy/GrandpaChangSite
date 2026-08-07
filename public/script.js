@@ -59,10 +59,45 @@ const canFullscreen = Boolean(playerFrame.requestFullscreen || playerFrame.webki
 if (!canFullscreen) fullscreenToggle.classList.add("is-hidden");
 
 function syncFullscreenButton() {
-  const on = currentFullscreenEl() === playerFrame;
+  const on = Boolean(currentFullscreenEl());
   fullscreenToggle.classList.toggle("is-active", on);
   fullscreenToggle.title = on ? "Exit fullscreen" : "Fullscreen";
   fullscreenToggle.setAttribute("aria-label", fullscreenToggle.title);
+}
+
+const playerNote = document.getElementById("player-note");
+let playerNoteTimer = null;
+
+function showPlayerNote(msg) {
+  if (!playerNote) return;
+  playerNote.textContent = msg;
+  playerNote.classList.remove("is-hidden");
+  clearTimeout(playerNoteTimer);
+  playerNoteTimer = setTimeout(() => playerNote.classList.add("is-hidden"), 9000);
+}
+
+// Browsers differ on which element they'll accept, so try the frame we own
+// first and fall back to the iframe itself before reporting failure.
+async function enterFullscreen() {
+  const targets = [
+    ["player frame", playerFrame],
+    ["player iframe", livePlayerFrame],
+  ];
+  const failures = [];
+
+  for (const [label, el] of targets) {
+    if (!el) continue;
+    try {
+      await requestFullscreen(el);
+      return true;
+    } catch (err) {
+      failures.push(`${label}: ${err.name || "Error"} — ${err.message || "no detail"}`);
+    }
+  }
+
+  console.error("Fullscreen failed:", failures);
+  showPlayerNote("Fullscreen blocked — " + failures.join(" | "));
+  return false;
 }
 
 fullscreenToggle.addEventListener("click", () => {
@@ -72,7 +107,7 @@ fullscreenToggle.addEventListener("click", () => {
   }
   // Fullscreen always goes from the docked frame, never the floating one.
   if (isPoppedOut) setPoppedOut(false);
-  requestFullscreen(playerFrame).catch((err) => console.error("Fullscreen failed:", err));
+  enterFullscreen();
 });
 
 document.addEventListener("fullscreenchange", syncFullscreenButton);

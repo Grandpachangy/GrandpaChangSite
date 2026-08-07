@@ -571,6 +571,26 @@ main {
   border-color: var(--accent-soft);
 }
 
+/* Surfaces a failed fullscreen request, which is otherwise invisible. */
+.player-note {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 84, 112, 0.5);
+  background: rgba(5, 6, 15, 0.9);
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: center;
+  backdrop-filter: blur(4px);
+}
+
 /* Drop the framing so the video fills the screen edge to edge. The controls
    sit inside .player-frame, so they stay reachable while fullscreen. */
 .player-frame:fullscreen {
