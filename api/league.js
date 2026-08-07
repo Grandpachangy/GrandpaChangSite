@@ -161,6 +161,30 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Diagnostic step 3: diag=2 proved Account-V1 (shared across all Riot
+  // games) works. This tests Spectator-V5 (League-specific) directly --
+  // different Riot APIs can have different product scopes on a personal
+  // key, so a key can legitimately pass one and fail the other.
+  if (req.query && req.query.diag === "3") {
+    const rojzzPuuid =
+      "haj42q43QALcHAo0xJONjvcIqPI-FSjTSxrMU0qfc_z1UfnrMsqESfkz5O7_0sbBDwe6d8lV2A-0Ug";
+    const testUrl =
+      `https://euw1.api.riotgames.com/lol/spectator/v5/active-games/by-puuid/${rojzzPuuid}`;
+    try {
+      const r = await fetch(testUrl, { headers: { "X-Riot-Token": apiKey } });
+      const bodyText = await r.text();
+      res.status(200).json({
+        requestedUrl: testUrl,
+        status: r.status,
+        statusText: r.statusText,
+        body: bodyText.slice(0, 500),
+      });
+    } catch (err) {
+      res.status(200).json({ requestedUrl: testUrl, threw: err.message });
+    }
+    return;
+  }
+
   try {
     // Stop at the first account found in a game -- normally at most one is,
     // so this usually costs far fewer calls than checking all of them. Track
