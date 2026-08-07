@@ -312,6 +312,17 @@ const nowPlayingEl = document.getElementById("nowplaying");
 const npArt = document.getElementById("np-art");
 const npTitle = document.getElementById("np-title");
 const npArtist = document.getElementById("np-artist");
+const npLabel = document.getElementById("np-label");
+
+// Compact relative time for the "last played" label.
+function timeAgoShort(unixSeconds) {
+  const mins = Math.floor((Date.now() / 1000 - unixSeconds) / 60);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 let nowPlayingTimer = null;
 let nowPlayingStopped = false;
 
@@ -338,14 +349,19 @@ async function checkNowPlaying() {
       return;
     }
 
-    if (!data.playing) {
+    // Nothing ever scrobbled: nothing worth showing.
+    if (!data.title) {
       nowPlayingEl.classList.add("is-hidden");
       return;
     }
 
     // textContent throughout: track and artist names are third-party data.
-    npTitle.textContent = data.title || "";
+    npTitle.textContent = data.title;
     npArtist.textContent = data.artist || "";
+    npLabel.textContent = data.playing
+      ? "Now playing"
+      : `Last played${data.playedAt ? " · " + timeAgoShort(data.playedAt) : ""}`;
+    nowPlayingEl.classList.toggle("is-idle", !data.playing);
 
     if (data.art) {
       npArt.src = data.art;

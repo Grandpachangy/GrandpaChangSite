@@ -734,6 +734,22 @@ main {
   animation: eq 900ms ease-in-out infinite alternate;
 }
 
+/* Idle ("last played") reads quieter than the live state: dimmed label and
+   a static, greyed equaliser so it can't be mistaken for live playback. */
+.nowplaying.is-idle {
+  opacity: 0.75;
+}
+
+.nowplaying.is-idle .nowplaying__label {
+  color: var(--text-dim);
+}
+
+.nowplaying.is-idle .nowplaying__bars i {
+  background: var(--text-dim);
+  animation: none;
+  transform: scaleY(0.55);
+}
+
 .nowplaying__bars i:nth-child(1) { height: 40%; animation-delay: 0ms; }
 .nowplaying__bars i:nth-child(2) { height: 90%; animation-delay: 180ms; }
 .nowplaying__bars i:nth-child(3) { height: 60%; animation-delay: 360ms; }

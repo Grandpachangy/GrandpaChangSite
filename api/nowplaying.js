@@ -33,15 +33,17 @@ module.exports = async (req, res) => {
       ? [].concat(data.recenttracks.track)[0]
       : null;
 
-    const isNowPlaying = Boolean(
-      track && track["@attr"] && track["@attr"].nowplaying === "true"
-    );
+    res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
 
-    if (!isNowPlaying) {
-      res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
-      res.status(200).json({ configured: true, playing: false });
+    // Nothing scrobbled at all: nothing to show either way.
+    if (!track) {
+      res.status(200).json({ configured: true, playing: false, track: null });
       return;
     }
+
+    const isNowPlaying = Boolean(
+      track["@attr"] && track["@attr"].nowplaying === "true"
+    );
 
     const images = Array.isArray(track.image) ? track.image : [];
     const preferred =
@@ -50,19 +52,21 @@ module.exports = async (req, res) => {
       images[images.length - 1] ||
       {};
     const art = typeof preferred["#text"] === "string" ? preferred["#text"] : "";
+    const playedAt =
+      track.date && track.date.uts ? Number(track.date.uts) : null;
 
-    // Short edge cache: keeps the widget responsive while still absorbing
-    // per-visitor polling so Last.fm sees roughly one request per window.
-    res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
+    // The most recent track is returned either way; `playing` says whether it
+    // is live right now or the last thing scrobbled.
     res.status(200).json({
       configured: true,
-      playing: true,
+      playing: isNowPlaying,
       title: track.name || "",
       artist: (track.artist && track.artist["#text"]) || "",
       album: (track.album && track.album["#text"]) || "",
       // Only pass through http(s) art URLs.
       art: /^https?:\/\//i.test(art) ? art : null,
       url: /^https?:\/\//i.test(track.url || "") ? track.url : null,
+      playedAt: isNowPlaying ? null : playedAt,
     });
   } catch (err) {
     console.error("nowplaying endpoint failed:", err);
