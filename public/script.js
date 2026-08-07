@@ -101,7 +101,28 @@ function setSidestream(open) {
 sidestreamToggle.addEventListener("click", () => setSidestream(!isSidestreamOpen));
 sidestreamClose.addEventListener("click", () => setSidestream(false));
 
+// ?preview forces the live layout without an actual broadcast, so the player
+// controls can be exercised while offline. Only active when the param is
+// present, so normal visitors are unaffected.
+const previewMode = new URLSearchParams(location.search).has("preview");
+
+function showLivePlayer() {
+  if (isLiveEmbedded) return;
+  livePlayerFrame.src = `https://itzon.tv/embed/${CHANNEL}`;
+  livePlayerSection.classList.remove("is-hidden");
+  offlinePanel.classList.add("is-hidden");
+  isLiveEmbedded = true;
+}
+
 async function checkLive() {
+  if (previewMode) {
+    liveBanner.classList.remove("is-hidden");
+    liveTitleEl.textContent = "Preview mode — showing the live layout, not actually live";
+    liveViewersEl.textContent = "";
+    showLivePlayer();
+    return;
+  }
+
   try {
     const res = await fetch("/api/live");
     const data = await res.json();
@@ -111,12 +132,7 @@ async function checkLive() {
       liveTitleEl.textContent = data.title || "";
       liveViewersEl.textContent = data.viewers ? `${data.viewers.toLocaleString()} watching` : "";
 
-      if (!isLiveEmbedded) {
-        livePlayerFrame.src = `https://itzon.tv/embed/${CHANNEL}`;
-        livePlayerSection.classList.remove("is-hidden");
-        offlinePanel.classList.add("is-hidden");
-        isLiveEmbedded = true;
-      }
+      showLivePlayer();
     } else {
       liveBanner.classList.add("is-hidden");
       livePlayerSection.classList.add("is-hidden");
