@@ -139,6 +139,28 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Diagnostic step 2: the key's shape is clean, so make one real call
+  // server-side and return Riot's actual status + response body. The
+  // account name is public info; the key itself is never included.
+  if (req.query && req.query.diag === "2") {
+    const testUrl =
+      `https://${ACCOUNT_CLUSTER}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/rojzz/euw`;
+    try {
+      const r = await fetch(testUrl, { headers: { "X-Riot-Token": apiKey } });
+      const bodyText = await r.text();
+      res.status(200).json({
+        requestedUrl: testUrl,
+        status: r.status,
+        statusText: r.statusText,
+        body: bodyText.slice(0, 500),
+        sentHeaderLength: apiKey.length,
+      });
+    } catch (err) {
+      res.status(200).json({ requestedUrl: testUrl, threw: err.message });
+    }
+    return;
+  }
+
   try {
     // Stop at the first account found in a game -- normally at most one is,
     // so this usually costs far fewer calls than checking all of them. Track
