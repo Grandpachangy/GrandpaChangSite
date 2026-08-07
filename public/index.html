@@ -100,15 +100,29 @@
       </p>
     </section>
 
-    <aside id="sidestream" class="sidestream is-hidden" aria-label="Twitch side stream">
-      <div class="sidestream__bar">
-        <span class="sidestream__label">Twitch stream</span>
-        <button type="button" id="sidestream-close" class="sidestream__close" aria-label="Close side stream">✕</button>
-      </div>
-      <div class="sidestream__frame">
-        <iframe id="sidestream-frame" src="" allowfullscreen scrolling="no"></iframe>
-      </div>
-    </aside>
+    <!-- Bottom-left floating stack: items sit in a column so the now-playing
+         card and the side stream can never overlap each other. -->
+    <div class="floating-stack">
+      <aside id="nowplaying" class="nowplaying is-hidden" aria-label="Now playing">
+        <span class="nowplaying__bars" aria-hidden="true"><i></i><i></i><i></i></span>
+        <img id="np-art" class="nowplaying__art is-hidden" alt="" width="44" height="44" />
+        <span class="nowplaying__meta">
+          <span class="nowplaying__label">Now playing</span>
+          <span id="np-title" class="nowplaying__title"></span>
+          <span id="np-artist" class="nowplaying__artist"></span>
+        </span>
+      </aside>
+
+      <aside id="sidestream" class="sidestream is-hidden" aria-label="Twitch side stream">
+        <div class="sidestream__bar">
+          <span class="sidestream__label">Twitch stream</span>
+          <button type="button" id="sidestream-close" class="sidestream__close" aria-label="Close side stream">✕</button>
+        </div>
+        <div class="sidestream__frame">
+          <iframe id="sidestream-frame" src="" allowfullscreen scrolling="no"></iframe>
+        </div>
+      </aside>
+    </div>
 
     <section class="hero" id="hero">
       <h1>GrandpaChang's Live Streams</h1>

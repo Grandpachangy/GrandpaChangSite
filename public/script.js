@@ -305,6 +305,51 @@ if (aboutAvatarImg) {
   if (aboutAvatarImg.complete && aboutAvatarImg.naturalWidth === 0) markMissing();
 }
 
+// Now playing, via Last.fm. Hidden entirely unless a track is actually
+// playing, so it stays out of the way when there's nothing to show.
+const NOWPLAYING_POLL_MS = 30 * 1000;
+const nowPlayingEl = document.getElementById("nowplaying");
+const npArt = document.getElementById("np-art");
+const npTitle = document.getElementById("np-title");
+const npArtist = document.getElementById("np-artist");
+let nowPlayingTimer = null;
+
+async function checkNowPlaying() {
+  try {
+    const res = await fetch("/api/nowplaying");
+    const data = await res.json();
+
+    // Credentials not set yet: stop polling rather than hammering the endpoint.
+    if (data.configured === false) {
+      nowPlayingEl.classList.add("is-hidden");
+      clearInterval(nowPlayingTimer);
+      return;
+    }
+
+    if (!data.playing) {
+      nowPlayingEl.classList.add("is-hidden");
+      return;
+    }
+
+    // textContent throughout: track and artist names are third-party data.
+    npTitle.textContent = data.title || "";
+    npArtist.textContent = data.artist || "";
+
+    if (data.art) {
+      npArt.src = data.art;
+      npArt.classList.remove("is-hidden");
+    } else {
+      npArt.removeAttribute("src");
+      npArt.classList.add("is-hidden");
+    }
+
+    nowPlayingEl.classList.remove("is-hidden");
+  } catch (err) {
+    nowPlayingEl.classList.add("is-hidden");
+    console.error("Now playing check failed:", err);
+  }
+}
+
 let isChatLoaded = false;
 function loadChat() {
   if (isChatLoaded) return;
@@ -320,4 +365,6 @@ if (document.readyState === "complete") {
 
 checkLive();
 loadVods();
+checkNowPlaying();
 setInterval(checkLive, LIVE_POLL_MS);
+nowPlayingTimer = setInterval(checkNowPlaying, NOWPLAYING_POLL_MS);
