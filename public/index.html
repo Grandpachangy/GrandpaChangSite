@@ -132,6 +132,23 @@
       </aside>
     </div>
 
+    <!-- Middle-right League status. The tab is always present; the card
+         slides out from behind it. Auto-opens the moment a tracked account
+         enters a game, but the tab always lets it be toggled either way. -->
+    <div id="league-widget" class="league-widget is-hidden">
+      <button type="button" id="league-toggle" class="league-tab" aria-label="Toggle League of Legends status" aria-expanded="false">
+        <span class="league-tab__icon">⚔</span>
+      </button>
+      <aside id="league-card" class="league-card is-collapsed" aria-label="League of Legends status">
+        <span id="league-dot" class="league-dot"></span>
+        <img id="league-icon" class="league-icon is-hidden" alt="" width="36" height="36" />
+        <span class="league-meta">
+          <span id="league-status" class="league-status">Not currently in game</span>
+          <span id="league-detail" class="league-detail"></span>
+        </span>
+      </aside>
+    </div>
+
     <section class="hero" id="hero">
       <h1>GrandpaChang's Live Streams</h1>
     </section>

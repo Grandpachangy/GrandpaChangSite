@@ -385,6 +385,87 @@ async function checkNowPlaying() {
   }
 }
 
+// League of Legends live-game status. Auto-opens the card the moment a
+// tracked account enters a game; the tab always lets it be toggled either
+// way afterward. The whole widget stays hidden until RIOT_API_KEY is
+// configured, matching the now-playing widget's degrade-quietly pattern.
+const LEAGUE_POLL_MS = 20 * 1000;
+const leagueWidget = document.getElementById("league-widget");
+const leagueToggle = document.getElementById("league-toggle");
+const leagueCard = document.getElementById("league-card");
+const leagueIcon = document.getElementById("league-icon");
+const leagueStatus = document.getElementById("league-status");
+const leagueDetail = document.getElementById("league-detail");
+
+let leagueOpen = false;
+let leagueWasInGame = false;
+let leagueTimer = null;
+let leagueStopped = false;
+
+function setLeagueOpen(open) {
+  leagueOpen = open;
+  leagueCard.classList.toggle("is-collapsed", !open);
+  leagueToggle.setAttribute("aria-expanded", String(open));
+}
+
+leagueToggle.addEventListener("click", () => setLeagueOpen(!leagueOpen));
+
+function startLeaguePolling() {
+  if (leagueStopped || leagueTimer) return;
+  leagueTimer = setInterval(checkLeague, LEAGUE_POLL_MS);
+}
+
+function stopLeaguePolling() {
+  clearInterval(leagueTimer);
+  leagueTimer = null;
+}
+
+async function checkLeague() {
+  try {
+    const res = await fetch("/api/league");
+    const data = await res.json();
+
+    // Credentials not set yet: stop polling rather than hammering the endpoint.
+    if (data.configured === false) {
+      leagueStopped = true;
+      stopLeaguePolling();
+      return;
+    }
+
+    leagueWidget.classList.remove("is-hidden");
+
+    if (data.inGame) {
+      leagueCard.classList.add("is-in-game");
+      // textContent: champion/account/queue values come from Riot's API.
+      leagueStatus.textContent = `Playing ${data.champion || "a champion"}`;
+      leagueDetail.textContent = [data.account, data.queue].filter(Boolean).join(" · ");
+
+      if (data.championIcon) {
+        leagueIcon.src = data.championIcon;
+        leagueIcon.alt = data.champion || "";
+        leagueIcon.classList.remove("is-hidden");
+      } else {
+        leagueIcon.removeAttribute("src");
+        leagueIcon.classList.add("is-hidden");
+      }
+
+      // Auto-open the moment a game starts; leave later manual toggles alone
+      // for the rest of that game.
+      if (!leagueWasInGame) setLeagueOpen(true);
+      leagueWasInGame = true;
+    } else {
+      leagueCard.classList.remove("is-in-game");
+      leagueStatus.textContent = "Not currently in game";
+      leagueDetail.textContent = "";
+      leagueIcon.removeAttribute("src");
+      leagueIcon.classList.add("is-hidden");
+      leagueWasInGame = false;
+    }
+  } catch (err) {
+    console.error("League check failed:", err);
+  }
+}
+
 let isChatLoaded = false;
 function loadChat() {
   if (isChatLoaded) return;
@@ -401,16 +482,21 @@ if (document.readyState === "complete") {
 checkLive();
 loadVods();
 checkNowPlaying();
+checkLeague();
 setInterval(checkLive, LIVE_POLL_MS);
 startNowPlayingPolling();
+startLeaguePolling();
 
 // Only poll while the tab is actually being looked at, and refresh the moment
 // it comes back so the card is current rather than up to one interval stale.
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     stopNowPlayingPolling();
+    stopLeaguePolling();
   } else {
     checkNowPlaying();
+    checkLeague();
     startNowPlayingPolling();
+    startLeaguePolling();
   }
 });
