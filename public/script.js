@@ -35,6 +35,49 @@ function setPoppedOut(poppedOut) {
 popoutToggle.addEventListener("click", () => setPoppedOut(!isPoppedOut));
 popoutRestore.addEventListener("click", () => setPoppedOut(false));
 
+// Fullscreen. itzon's embed exposes no controls of its own (its <video> has
+// no `controls` attribute and the only URL param it reads is `preview`), so
+// the fullscreen request is driven from here against the frame we own.
+const fullscreenToggle = document.getElementById("fullscreen-toggle");
+
+function currentFullscreenEl() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function requestFullscreen(el) {
+  if (el.requestFullscreen) return el.requestFullscreen();
+  if (el.webkitRequestFullscreen) return Promise.resolve(el.webkitRequestFullscreen());
+  return Promise.reject(new Error("Fullscreen not supported"));
+}
+
+function exitFullscreen() {
+  if (document.exitFullscreen) return document.exitFullscreen();
+  if (document.webkitExitFullscreen) return Promise.resolve(document.webkitExitFullscreen());
+}
+
+const canFullscreen = Boolean(playerFrame.requestFullscreen || playerFrame.webkitRequestFullscreen);
+if (!canFullscreen) fullscreenToggle.classList.add("is-hidden");
+
+function syncFullscreenButton() {
+  const on = currentFullscreenEl() === playerFrame;
+  fullscreenToggle.classList.toggle("is-active", on);
+  fullscreenToggle.title = on ? "Exit fullscreen" : "Fullscreen";
+  fullscreenToggle.setAttribute("aria-label", fullscreenToggle.title);
+}
+
+fullscreenToggle.addEventListener("click", () => {
+  if (currentFullscreenEl()) {
+    exitFullscreen();
+    return;
+  }
+  // Fullscreen always goes from the docked frame, never the floating one.
+  if (isPoppedOut) setPoppedOut(false);
+  requestFullscreen(playerFrame).catch((err) => console.error("Fullscreen failed:", err));
+});
+
+document.addEventListener("fullscreenchange", syncFullscreenButton);
+document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
+
 // Side stream: the Twitch player in a small floating window, running
 // alongside the main itzon.tv player. Muted by default so it doesn't fight
 // the main player for audio; viewers can unmute it in the player itself.
