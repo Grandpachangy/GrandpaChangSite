@@ -83,7 +83,9 @@ async function getPuuid(account, apiKey) {
   const res = await riotFetch(url, apiKey);
   if (!res.ok) {
     // Don't cache failures -- a bad key or transient error shouldn't stick.
-    throw new Error(`Account lookup failed for ${key}: ${res.status}`);
+    const err = new Error(`Account lookup failed for ${key}: ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
 
   const data = await res.json();
@@ -101,7 +103,11 @@ async function getActiveGame(account, apiKey) {
 
   // 404 is the normal "not currently in a game" answer.
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Spectator failed for ${account.platform}: ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`Spectator failed for ${account.platform}: ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
 
   const game = await res.json();
   const me = (game.participants || []).find((p) => p.puuid === puuid);
@@ -119,13 +125,21 @@ module.exports = async (req, res) => {
 
   try {
     // Stop at the first account found in a game -- normally at most one is,
-    // so this usually costs far fewer calls than checking all of them.
+    // so this usually costs far fewer calls than checking all of them. Track
+    // outcomes so a completely broken key (every account 401/403) can be
+    // told apart from a working key that genuinely finds nobody in a game --
+    // both would otherwise produce an identical inGame:false response.
+    let checkedOk = 0;
+    let authFailures = 0;
+
     for (const account of ACCOUNTS) {
       let result = null;
       try {
         result = await getActiveGame(account, apiKey);
+        checkedOk++;
       } catch (err) {
         // One bad account shouldn't take down the whole widget.
+        if (err.status === 401 || err.status === 403) authFailures++;
         console.error("league: account check failed:", err.message);
         continue;
       }
@@ -151,8 +165,21 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // Every single account failed auth: the key is set but not actually
+    // valid (revoked, malformed, wrong region). Surfaced as a distinct
+    // response rather than a silent "not in game" -- the widget itself still
+    // only branches on inGame, but this is visible to anyone checking the
+    // endpoint directly, and it's what to check first if the widget never
+    // lights up despite the account genuinely being in a game.
+    if (checkedOk === 0 && authFailures === ACCOUNTS.length) {
+      console.error("league: all accounts failed auth -- RIOT_API_KEY is set but invalid");
+      res.setHeader("Cache-Control", "s-maxage=20");
+      res.status(200).json({ configured: true, keyValid: false, inGame: false });
+      return;
+    }
+
     res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
-    res.status(200).json({ configured: true, inGame: false });
+    res.status(200).json({ configured: true, keyValid: true, inGame: false, checkedAccounts: checkedOk });
   } catch (err) {
     console.error("league endpoint failed:", err);
     res.status(500).json({ error: "Unable to fetch League status" });
