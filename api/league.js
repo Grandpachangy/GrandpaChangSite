@@ -35,6 +35,21 @@ const QUEUE_NAMES = {
 
 // PUUIDs are stable, so resolve each Riot ID once per warm instance.
 const puuidCache = new Map();
+
+// Which account was last found in a game. Checked first on the next sweep:
+// while a game is running that turns an 8-call sweep into a 1-call hit,
+// which matters because the Riot personal-key budget (~50 req/min) is the
+// binding constraint on how fast this endpoint can poll.
+let lastActiveKey = null;
+
+function accountsByPriority() {
+  if (!lastActiveKey) return ACCOUNTS;
+  const idx = ACCOUNTS.findIndex(
+    (a) => `${a.gameName}#${a.tagLine}` === lastActiveKey
+  );
+  if (idx <= 0) return ACCOUNTS;
+  return [ACCOUNTS[idx], ...ACCOUNTS.slice(0, idx), ...ACCOUNTS.slice(idx + 1)];
+}
 let championsCache = null;
 let championsCachedAt = 0;
 const CHAMPIONS_TTL_MS = 24 * 60 * 60 * 1000;
@@ -136,7 +151,7 @@ module.exports = async (req, res) => {
     let checkedOk = 0;
     let authFailures = 0;
 
-    for (const account of ACCOUNTS) {
+    for (const account of accountsByPriority()) {
       let result = null;
       try {
         result = await getActiveGame(account, apiKey);
@@ -152,8 +167,11 @@ module.exports = async (req, res) => {
       const { game, me } = result;
       const champions = await getChampionIndex();
       const champ = champions.byId.get(String(me.championId));
+      lastActiveKey = `${account.gameName}#${account.tagLine}`;
 
-      res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
+      // No stale-while-revalidate here: serving a deliberately stale answer
+      // is the wrong trade for "am I in a game right now".
+      res.setHeader("Cache-Control", "s-maxage=15");
       res.status(200).json({
         configured: true,
         inGame: true,
@@ -182,7 +200,10 @@ module.exports = async (req, res) => {
       return;
     }
 
-    res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
+    // Nobody in a game: clear the priority hint so the next sweep doesn't
+    // keep favouring an account that's since finished playing.
+    lastActiveKey = null;
+    res.setHeader("Cache-Control", "s-maxage=15");
     res.status(200).json({ configured: true, keyValid: true, inGame: false, checkedAccounts: checkedOk });
   } catch (err) {
     console.error("league endpoint failed:", err);

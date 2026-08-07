@@ -389,7 +389,7 @@ async function checkNowPlaying() {
 // tracked account enters a game; the tab always lets it be toggled either
 // way afterward. The whole widget stays hidden until RIOT_API_KEY is
 // configured, matching the now-playing widget's degrade-quietly pattern.
-const LEAGUE_POLL_MS = 20 * 1000;
+const LEAGUE_POLL_MS = 10 * 1000;
 const leagueWidget = document.getElementById("league-widget");
 const leagueToggle = document.getElementById("league-toggle");
 const leagueCard = document.getElementById("league-card");
