@@ -333,16 +333,22 @@ module.exports = async (req, res) => {
         champion: championPayload(idx, me.championId),
         queue: queueLabel(game),
         queueId: game.gameQueueConfigId ?? null,
-        // Absolute start time is the better clock source: it cannot stall the
-        // way gameLength does early in a match, and being absolute it survives
-        // the edge cache -- the client derives elapsed time itself rather than
-        // trusting a snapshot that may be up to s-maxage seconds old.
-        // It reads 0 during the loading screen, hence the gameLength fallback.
+        // gameLength is what matches the clock on the player's screen: it
+        // crosses zero exactly when the in-game clock starts, running negative
+        // during the loading screen. gameStartTime is roughly a minute earlier
+        // than that, so counting from it runs ahead; it stays only as a
+        // fallback. Riot refreshes gameLength in coarse steps (~60s), which the
+        // client smooths over by ticking locally between syncs.
+        //
+        // fetchedAt is when we actually read Riot, so the client can add the
+        // time since -- including any seconds the response spent in the edge
+        // cache, which would otherwise make the timer read low.
+        gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
+        fetchedAt: Date.now(),
         gameStartedAt:
           typeof game.gameStartTime === "number" && game.gameStartTime > 0
             ? game.gameStartTime
             : null,
-        gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
         side: myTeam === 100 ? "Blue" : "Red",
         spells: [spellPayload(idx, me.spell1Id), spellPayload(idx, me.spell2Id)].filter(Boolean),
         allyTeam: lineup(allies),

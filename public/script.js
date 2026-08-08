@@ -433,11 +433,13 @@ function renderClock() {
   leagueTimerEl.textContent = formatClock(elapsed);
 }
 
-// Riot's spectator `gameLength` can sit frozen for the first minutes of a
-// match -- a live game reported 120 for well over half a minute. Re-syncing to
-// a stalled value would drag the timer backwards on every poll, so a sync is
-// only accepted when it moves forward. A large backwards jump is a different
-// game starting, and does reset the clock.
+// Riot refreshes `gameLength` in coarse steps of about a minute, so between
+// refreshes it reads progressively behind the real clock -- measured live it
+// swung from accurate to ~66s stale and back. Re-syncing to a stale read would
+// drag the timer backwards, so a sync is only accepted when it moves forward:
+// the display then tracks the accurate value each refresh lands on, and ticks
+// locally in between. A large backwards jump is a different game starting, and
+// does reset the clock.
 const CLOCK_RESET_THRESHOLD_SEC = 90;
 
 function startGameClock(baseSec) {
@@ -649,14 +651,23 @@ function renderInGame(data) {
     leagueBans.classList.add("is-hidden");
   }
 
-  // Prefer the absolute start time: gameLength stalls early in a match, and
-  // whatever it stalls at becomes a permanent lag once it starts counting
-  // again. Deriving elapsed time locally also sidesteps the edge cache, which
-  // can hand out a snapshot several seconds old.
-  if (typeof data.gameStartedAt === "number" && data.gameStartedAt > 0) {
+  // gameLength is the source that matches the clock on the player's screen.
+  // Riot refreshes it in coarse ~60s steps, so a given read is anywhere from
+  // current to a minute behind; `fetchedAt` covers the time it then spent in
+  // the edge cache, and startGameClock's forward-only rule does the rest --
+  // stale reads are ignored while the local tick keeps running, so the display
+  // settles on the accurate value each refresh lands on.
+  //
+  // gameStartTime is deliberately not preferred: it precedes the in-game clock
+  // reaching 0:00 by roughly a minute, so counting from it runs ahead.
+  if (typeof data.gameLengthSec === "number") {
+    const cacheAgeSec =
+      typeof data.fetchedAt === "number"
+        ? Math.max(0, (Date.now() - data.fetchedAt) / 1000)
+        : 0;
+    startGameClock(data.gameLengthSec + cacheAgeSec);
+  } else if (typeof data.gameStartedAt === "number" && data.gameStartedAt > 0) {
     startGameClock((Date.now() - data.gameStartedAt) / 1000);
-  } else if (typeof data.gameLengthSec === "number") {
-    startGameClock(data.gameLengthSec);
   } else {
     stopGameClock();
   }
