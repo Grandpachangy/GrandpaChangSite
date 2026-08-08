@@ -315,6 +315,15 @@ module.exports = async (req, res) => {
         champion: championPayload(idx, me.championId),
         queue: queueLabel(game),
         queueId: game.gameQueueConfigId ?? null,
+        // Absolute start time is the better clock source: it cannot stall the
+        // way gameLength does early in a match, and being absolute it survives
+        // the edge cache -- the client derives elapsed time itself rather than
+        // trusting a snapshot that may be up to s-maxage seconds old.
+        // It reads 0 during the loading screen, hence the gameLength fallback.
+        gameStartedAt:
+          typeof game.gameStartTime === "number" && game.gameStartTime > 0
+            ? game.gameStartTime
+            : null,
         gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
         side: myTeam === 100 ? "Blue" : "Red",
         spells: [spellPayload(idx, me.spell1Id), spellPayload(idx, me.spell2Id)].filter(Boolean),

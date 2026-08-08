@@ -602,7 +602,13 @@ function renderInGame(data) {
     leagueBans.classList.add("is-hidden");
   }
 
-  if (typeof data.gameLengthSec === "number") {
+  // Prefer the absolute start time: gameLength stalls early in a match, and
+  // whatever it stalls at becomes a permanent lag once it starts counting
+  // again. Deriving elapsed time locally also sidesteps the edge cache, which
+  // can hand out a snapshot several seconds old.
+  if (typeof data.gameStartedAt === "number" && data.gameStartedAt > 0) {
+    startGameClock((Date.now() - data.gameStartedAt) / 1000);
+  } else if (typeof data.gameLengthSec === "number") {
     startGameClock(data.gameLengthSec);
   } else {
     stopGameClock();
