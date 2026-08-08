@@ -538,6 +538,10 @@ function stopLeaguePolling() {
 // exactly when the result went missing.
 const LEAGUE_HINT_KEY = "league:lastAccount";
 const LEAGUE_HINT_WINDOW_MS = 12 * 60 * 1000;
+// How long a finished game's result stays on screen, measured from first sight.
+const POSTGAME_DISPLAY_MS = 5 * 60 * 1000;
+let postGameSeenKey = null;
+let postGameSeenAt = 0;
 
 function readLeagueHint() {
   try {
@@ -607,9 +611,28 @@ async function checkLeague() {
     // otherwise expires on its own after LEAGUE_HINT_WINDOW_MS.
     if (state === "idle" && leagueLastState === "post-game") writeLeagueHint(null);
 
-    if (state === "in-game") {
+    // How long a result stays on screen is timed from when this page first
+    // saw it, not from when the match ended. Match-V5 publishes some minutes
+    // late, and timing it from the end meant that lag silently shortened the
+    // window -- or consumed it before the result ever became available.
+    let effectiveState = state;
+    if (state === "post-game") {
+      const key = data.endedAt || data.durationSec || "current";
+      if (postGameSeenKey !== key) {
+        postGameSeenKey = key;
+        postGameSeenAt = Date.now();
+      }
+      if (Date.now() - postGameSeenAt > POSTGAME_DISPLAY_MS) {
+        effectiveState = "idle";
+        writeLeagueHint(null);
+      }
+    } else if (state === "in-game") {
+      postGameSeenKey = null;
+    }
+
+    if (effectiveState === "in-game") {
       renderInGame(data);
-    } else if (state === "post-game") {
+    } else if (effectiveState === "post-game") {
       renderPostGame(data);
     } else {
       renderIdle();
@@ -618,10 +641,13 @@ async function checkLeague() {
     // Auto-open on entering a game and again when the result lands, since
     // both are moments worth surfacing. Manual toggles within a state are
     // left alone.
-    if (state !== leagueLastState && (state === "in-game" || state === "post-game")) {
+    if (
+      effectiveState !== leagueLastState &&
+      (effectiveState === "in-game" || effectiveState === "post-game")
+    ) {
       setLeagueOpen(true);
     }
-    leagueLastState = state;
+    leagueLastState = effectiveState;
   } catch (err) {
     console.error("League check failed:", err);
   }

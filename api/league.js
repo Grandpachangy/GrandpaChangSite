@@ -76,6 +76,9 @@ let lastActiveKey = null;
 let lastActiveSeenAt = 0;
 
 // Post-game results are re-read at most this often, rather than every sweep.
+// Why the last post-game lookup produced nothing, surfaced via ?diag=1.
+let lastPostGameMiss = null;
+
 let postGameCache = null;
 let postGameCacheKey = null;
 let postGameCachedAt = 0;
@@ -225,20 +228,37 @@ async function getPostGame(account, apiKey) {
     `${encodeURIComponent(puuid)}/ids?start=0&count=1`;
 
   const idsRes = await riotFetch(idsUrl, apiKey);
-  if (!idsRes.ok) return null;
+  if (!idsRes.ok) {
+    lastPostGameMiss = `match-ids ${idsRes.status}`;
+    return null;
+  }
   const ids = await idsRes.json();
-  if (!Array.isArray(ids) || !ids.length) return null;
+  if (!Array.isArray(ids) || !ids.length) {
+    lastPostGameMiss = "no matches returned";
+    return null;
+  }
 
   const matchRes = await riotFetch(
     `https://${ACCOUNT_CLUSTER}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(ids[0])}`,
     apiKey
   );
-  if (!matchRes.ok) return null;
+  if (!matchRes.ok) {
+    lastPostGameMiss = `match-detail ${matchRes.status}`;
+    return null;
+  }
 
   const match = await matchRes.json();
   const info = match.info || {};
   const endedAt = info.gameEndTimestamp || 0;
-  if (!endedAt || now - endedAt > POSTGAME_WINDOW_MS) {
+  // Accept anything recent enough to still be worth showing. How long it
+  // actually stays on screen is decided by the client, timed from when it
+  // first saw the result -- Match-V5 does not publish the instant a game ends,
+  // and timing the window from the match's end let that lag eat into it, or
+  // consume it entirely when publishing took longer than the window itself.
+  if (!endedAt || now - endedAt > POSTGAME_LOOKUP_WINDOW_MS) {
+    lastPostGameMiss = endedAt
+      ? `latest match ended ${Math.round((now - endedAt) / 1000)}s ago`
+      : "no gameEndTimestamp";
     postGameCache = null;
     postGameCacheKey = cacheKey;
     postGameCachedAt = now;
@@ -246,7 +266,11 @@ async function getPostGame(account, apiKey) {
   }
 
   const me = (info.participants || []).find((p) => p.puuid === puuid);
-  if (!me) return null;
+  if (!me) {
+    lastPostGameMiss = "player not in match participants";
+    return null;
+  }
+  lastPostGameMiss = null;
 
   const idx = await getStaticIndex();
   const result = {
@@ -431,12 +455,24 @@ module.exports = async (req, res) => {
     }
 
     res.setHeader("Cache-Control", "s-maxage=15");
-    res.status(200).json({
+    const idle = {
       configured: true,
       keyValid: true,
       state: "idle",
       checkedAccounts: checkedOk,
-    });
+    };
+    // ?diag=1 explains an empty post-game lookup, which is otherwise silent.
+    // Nothing here is sensitive: status codes and timings only, no key.
+    if (req.query && req.query.diag) {
+      idle.diag = {
+        hintAccepted: account
+          ? `${account.gameName}#${account.tagLine}`
+          : null,
+        serverRemembers: Boolean(serverRemembers),
+        postGameMiss: lastPostGameMiss,
+      };
+    }
+    res.status(200).json(idle);
   } catch (err) {
     console.error("league endpoint failed:", err);
     res.status(500).json({ error: "Unable to fetch League status" });
