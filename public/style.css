@@ -2388,25 +2388,26 @@ html:not(.js) h2::after {
 /* ============================================================
    Reduced effects (perf-lite)
 
-   Applied when measured frame pacing says the machine can't keep up --
-   most commonly hardware acceleration being switched off, where the
-   compositor's cheap tricks all become CPU work.
+   Applied when the renderer turns out to be software, or measured frame
+   pacing says the machine can't keep up. Hardware acceleration being
+   switched off is the usual cause.
 
-   The rule here is: cut cost, keep the design. Everything that still
-   moves keeps moving. What goes is the three genuinely expensive
-   categories -- real-time backdrop blur, large animated blur filters,
-   and the branches' 3D context -- each replaced with a static
-   equivalent that reads the same at a glance.
+   Scope is deliberately narrow: blur, and nothing else. Real-time blur
+   is far and away the most expensive thing on the page without a GPU --
+   backdrop-filter resamples everything beneath it every frame, and the
+   sky filters blur large surfaces that are being animated. Everything
+   else stays exactly as designed: the branches keep their 3D depth, all
+   the petals fall, both lightning sheets flash, the wash drifts and the
+   swirl turns.
    ============================================================ */
 
-/* 1. backdrop-filter samples and blurs everything beneath, every frame.
-      Without a GPU it is the single most expensive thing on the page, so
-      it is dropped and the surfaces are made opaque enough to stay
-      legible on their own. */
+/* backdrop-filter samples and blurs whatever sits behind the element on
+   every frame. Dropping it leaves these surfaces transparent enough to be
+   hard to read, so each one gains an opaque background in exchange --
+   frosted glass becomes flat glass. */
 .perf-lite .site-header.is-stuck,
 .perf-lite .menu__panel,
 .perf-lite .modal__scrim,
-.perf-lite .modal__panel,
 .perf-lite .nowplaying,
 .perf-lite .league-tab,
 .perf-lite .league-card,
@@ -2426,85 +2427,17 @@ html:not(.js) h2::after {
 .perf-lite .modal__scrim { background: rgba(5, 3, 12, 0.9); }
 .perf-lite .popout-btn,
 .perf-lite .vods-nav { background: rgba(10, 6, 22, 0.92); }
+.perf-lite .player-note { background: rgba(10, 6, 22, 0.96); }
+.perf-lite .vod-card__play { background: rgba(10, 6, 22, 0.8); }
 
-/* 2. Both sky washes are large elements running a blur across an animated
-      scale, which forces a fresh software rasterisation every frame. The
-      gradients are already soft, so losing the blur costs little; the
-      swirl is a conic gradient that needs it to hide its seam, so that
-      layer steps aside entirely and the wash carries the colour. */
-.perf-lite .sky__wash {
-  filter: none;
-  animation: none;
-  will-change: auto;
-}
-
+/* Both sky layers blur a large area while being animated, which forces a
+   fresh rasterisation of that area every frame in software. They keep
+   moving; they just stop being blurred. Neither leans on the blur for its
+   shape -- the wash is radial gradients, already soft, and the swirl's
+   conic stops interpolate on their own and sit at very low alpha. */
+.perf-lite .sky__wash,
 .perf-lite .sky__swirl {
-  display: none;
-}
-
-/* 3. Flatten the branches. A perspective context with layers at differing
-      depths is rasterised per frame in software. The rustle stays, as a
-      2D sway, and the rim light stays because it costs nothing. */
-.perf-lite .branch {
-  perspective: none;
-}
-
-.perf-lite .branch__depth {
-  transform-style: flat;
-  animation-name: rustle-flat;
-}
-
-.perf-lite .branch__blossoms {
-  animation-name: rustle-tips-flat;
-}
-
-.perf-lite .branch__rim {
-  transform: translate(1.2px, -1.2px);
-}
-
-@keyframes rustle-flat {
-  0%, 100% { transform: rotate(-0.4deg); }
-  14% { transform: rotate(0.22deg); }
-  27% { transform: rotate(-0.16deg); }
-  41% { transform: rotate(0.46deg); }
-  55% { transform: rotate(-0.3deg); }
-  63% { transform: rotate(1deg); }
-  69% { transform: rotate(-0.42deg); }
-  75% { transform: rotate(0.7deg); }
-  86% { transform: rotate(-0.2deg); }
-}
-
-@keyframes rustle-tips-flat {
-  0%, 100% { transform: rotate(0.5deg); }
-  17% { transform: rotate(-0.35deg); }
-  33% { transform: rotate(0.62deg); }
-  48% { transform: rotate(-0.5deg); }
-  61% { transform: rotate(0.9deg); }
-  72% { transform: rotate(-0.66deg); }
-  88% { transform: rotate(0.3deg); }
-}
-
-/* 4. Fewer simultaneously animating layers. Half the petals and the second
-      lightning sheet go; both are ambient enough that thinning them reads
-      as restraint rather than absence. */
-.perf-lite .petals i:nth-child(even),
-.perf-lite .flash--b {
-  display: none;
-}
-
-/* The equaliser and rotating art are tiny but repaint constantly. */
-.perf-lite .nowplaying__art {
-  animation: none;
-}
-
-/* Shadows are cheap to declare and expensive to composite in software when
-   they sit on animated or frequently repainted surfaces. */
-.perf-lite .vod-card:hover {
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
-}
-
-.perf-lite .moon__disc {
-  box-shadow: 0 0 40px rgba(236, 230, 255, 0.35);
+  filter: none;
 }
 
 /* ============================================================

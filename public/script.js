@@ -14,13 +14,25 @@ const parentHost = window.location.hostname || "localhost";
 // battery saver. Falling behind switches the page to `perf-lite`, which drops
 // the expensive effects and keeps the movement.
 // ---------------------------------------------------------------------------
+// A measured verdict, which expires -- a machine's circumstances change.
 const PERF_KEY = "perf:lite";
+// An explicit choice made via ?lite=. Deliberately has no expiry and suppresses
+// measurement entirely, so telling someone "add ?lite=0" actually sticks.
+const PERF_CHOICE_KEY = "perf:choice";
+// Kept in step with the inline tier script in index.html <head>.
 const PERF_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // ~42fps. Comfortably below 60Hz without tripping on a 120Hz display, where a
 // genuinely smooth frame is 8ms and an occasional 16ms one is still fine.
 const SLOW_FRAME_MS = 24;
+// A frame this long means the tab was hidden or the thread was busy with
+// something unrelated. That is not a measure of how fast the page renders.
+const FRAME_DISCONTINUITY_MS = 250;
 
-const perfOverride = new URLSearchParams(location.search).get("lite");
+const perfParam = new URLSearchParams(location.search).get("lite");
+
+function isPerfLite() {
+  return document.documentElement.classList.contains("perf-lite");
+}
 
 function setPerfLite(on) {
   document.documentElement.classList.toggle("perf-lite", on);
@@ -34,22 +46,26 @@ function storePerfLite(on) {
   }
 }
 
-// A stored verdict is applied before the first paint of the heavy layers, so a
-// returning visitor isn't made to sit through the measurement window again.
-(function applyStoredPerfTier() {
-  if (perfOverride === "1") return setPerfLite(true);
-  if (perfOverride === "0") {
-    storePerfLite(false);
-    return;
-  }
+function readPerfChoice() {
   try {
-    const raw = localStorage.getItem(PERF_KEY);
-    if (!raw) return;
-    const { lite, at } = JSON.parse(raw);
-    // Re-measure occasionally: a machine's circumstances change.
-    if (Date.now() - at < PERF_TTL_MS) setPerfLite(Boolean(lite));
+    return localStorage.getItem(PERF_CHOICE_KEY);
   } catch (err) {
-    /* Ignore a malformed value and just measure again. */
+    return null;
+  }
+}
+
+// The class itself is applied by the inline script in <head>; this only records
+// what future visits should do.
+(function persistPerfChoice() {
+  try {
+    if (perfParam === "1" || perfParam === "0") {
+      localStorage.setItem(PERF_CHOICE_KEY, perfParam);
+    } else if (perfParam === "auto") {
+      localStorage.removeItem(PERF_CHOICE_KEY);
+      localStorage.removeItem(PERF_KEY);
+    }
+  } catch (err) {
+    /* Without storage the choice simply lasts for this page view. */
   }
 })();
 
@@ -65,8 +81,13 @@ function detectSoftwareRendering() {
   try {
     const canvas = document.createElement("canvas");
     gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    // No context at all is the usual shape of acceleration being disabled.
-    if (!gl) return true;
+    // Deliberately inconclusive rather than "software". Chromium with
+    // acceleration off still serves WebGL through SwiftShader, so it is caught
+    // by the name test below; a missing context far more often means WebGL is
+    // blocked (Lockdown Mode, Tor, enterprise policy) or the live-context cap
+    // is exhausted, none of which say anything about compositing. Treating it
+    // as proof would downgrade a perfectly fast machine for a week.
+    if (!gl) return null;
 
     const info = gl.getExtension("WEBGL_debug_renderer_info");
     const renderer = info
@@ -87,31 +108,28 @@ function detectSoftwareRendering() {
   }
 }
 
-function measureFramePacing() {
-  if (perfOverride !== null) return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-  // A software rasteriser is conclusive on its own, and cheaper to establish
-  // than a second of sampling.
-  if (detectSoftwareRendering() === true) {
-    setPerfLite(true);
-    storePerfLite(true);
-    console.info("Reduced effects: software rendering detected. Add ?lite=0 to force them back on.");
-    return;
-  }
-
+function sampleFramePacing() {
   const deltas = [];
   let last = performance.now();
   // Skip the first frames: load, font swap and iframe attach all land there.
   let warmup = 12;
+  // Bounds the run on a page that never settles enough to produce 70 clean
+  // frames, so this can't schedule itself indefinitely.
+  let attempts = 0;
 
   function frame(now) {
     const dt = now - last;
     last = now;
+    if (++attempts > 600) return;
 
-    // A backgrounded tab throttles rAF to a crawl; that is not the page being
-    // slow, so the sample is abandoned rather than counted.
-    if (document.hidden) return;
+    // Discard the frame and keep going, rather than abandoning the run. A page
+    // opened in a background tab used to return here and never produce a
+    // verdict at all, which on browsers that mask the renderer name left the
+    // frame sample as the only signal -- and it never fired.
+    if (document.hidden || dt > FRAME_DISCONTINUITY_MS) {
+      requestAnimationFrame(frame);
+      return;
+    }
 
     if (warmup > 0) {
       warmup--;
@@ -120,13 +138,20 @@ function measureFramePacing() {
       if (deltas.length >= 70) {
         deltas.sort((a, b) => a - b);
         const median = deltas[Math.floor(deltas.length / 2)];
-        const lite = median > SLOW_FRAME_MS;
-        setPerfLite(lite);
-        storePerfLite(lite);
-        if (lite) {
+
+        if (median > SLOW_FRAME_MS) {
+          setPerfLite(true);
+          storePerfLite(true);
           console.info(
-            `Reduced effects: median frame ${median.toFixed(1)}ms. Add ?lite=0 to force them back on.`
+            `Reduced effects: median frame ${median.toFixed(1)}ms. Add ?lite=0 to keep them on.`
           );
+        } else if (!isPerfLite()) {
+          // Only recorded when the full-cost page is what was actually
+          // measured. Reading a healthy median off the reduced page says
+          // nothing about how the full one would perform -- acting on it would
+          // switch every effect back on mid-visit, and flip the stored verdict
+          // so the next visit started heavy again.
+          storePerfLite(false);
         }
         return;
       }
@@ -136,11 +161,36 @@ function measureFramePacing() {
   requestAnimationFrame(frame);
 }
 
-// Measure once the page has settled, so start-up work isn't mistaken for jank.
+function decidePerfTier() {
+  // An explicit choice wins outright, whether made in this URL or a previous
+  // one. `?lite=auto` clears it and falls through to detection again.
+  if (perfParam === "1" || perfParam === "0") return;
+  if (perfParam !== "auto" && readPerfChoice() !== null) return;
+
+  // Checked before the motion preference, because almost nothing the reduced
+  // tier disables is motion: the backdrop blurs and sky filters cost the same
+  // whether or not anything is animating, and they are the bulk of the work.
+  if (detectSoftwareRendering() === true) {
+    setPerfLite(true);
+    storePerfLite(true);
+    console.info(
+      "Reduced effects: software rendering detected. Add ?lite=0 to keep them on."
+    );
+    return;
+  }
+
+  // With animations switched off there is nothing for frame pacing to measure,
+  // so sampling would only read an idle page.
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  sampleFramePacing();
+}
+
+// Decide once the page has settled, so start-up work isn't mistaken for jank.
 if (document.readyState === "complete") {
-  setTimeout(measureFramePacing, 900);
+  setTimeout(decidePerfTier, 900);
 } else {
-  window.addEventListener("load", () => setTimeout(measureFramePacing, 900), { once: true });
+  window.addEventListener("load", () => setTimeout(decidePerfTier, 900), { once: true });
 }
 
 // Keeping the live state in the tab title means a pinned or background tab
