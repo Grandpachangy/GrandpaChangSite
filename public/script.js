@@ -442,6 +442,14 @@ function renderClock() {
 // does reset the clock.
 const CLOCK_RESET_THRESHOLD_SEC = 90;
 
+// Riot's gameLength runs a constant ~30s behind the clock on the player's
+// screen, even immediately after it refreshes. Measured against a live game:
+// the in-game clock read 15:10 while a freshly refreshed gameLength gave
+// 14:40. (gameStartTime sits 60s the other side of it, which is why counting
+// from that ran 30s ahead.) Applied at the point of display so the API keeps
+// reporting Riot's raw value.
+const CLOCK_OFFSET_SEC = 30;
+
 function startGameClock(baseSec) {
   const displayed =
     gameClockBaseSec === null
@@ -580,9 +588,13 @@ async function checkLeague() {
     // Refresh the hint while a game runs, so it stays valid for the
     // post-game lookup once the match ends.
     if (state === "in-game" && data.account) writeLeagueHint(data.account);
-    // Once idle, the result has already been shown or the window has passed;
-    // dropping it stops needless match-history lookups on later polls.
-    if (state === "idle") writeLeagueHint(null);
+    // Deliberately NOT cleared on a plain idle. Match-V5 does not publish a
+    // match the instant it ends, so the first polls after a game legitimately
+    // come back idle -- dropping the hint there meant we stopped looking right
+    // before the result became available, which is why finished games never
+    // appeared. It is cleared once a result has actually been shown, and
+    // otherwise expires on its own after LEAGUE_HINT_WINDOW_MS.
+    if (state === "idle" && leagueLastState === "post-game") writeLeagueHint(null);
 
     if (state === "in-game") {
       renderInGame(data);
@@ -658,16 +670,17 @@ function renderInGame(data) {
   // stale reads are ignored while the local tick keeps running, so the display
   // settles on the accurate value each refresh lands on.
   //
-  // gameStartTime is deliberately not preferred: it precedes the in-game clock
-  // reaching 0:00 by roughly a minute, so counting from it runs ahead.
+  // gameStartTime is only a fallback, and it sits on the far side of the real
+  // clock: it precedes 0:00 by about a minute, so it runs as far ahead as
+  // gameLength runs behind. Hence the same constant, subtracted.
   if (typeof data.gameLengthSec === "number") {
     const cacheAgeSec =
       typeof data.fetchedAt === "number"
         ? Math.max(0, (Date.now() - data.fetchedAt) / 1000)
         : 0;
-    startGameClock(data.gameLengthSec + cacheAgeSec);
+    startGameClock(data.gameLengthSec + cacheAgeSec + CLOCK_OFFSET_SEC);
   } else if (typeof data.gameStartedAt === "number" && data.gameStartedAt > 0) {
-    startGameClock((Date.now() - data.gameStartedAt) / 1000);
+    startGameClock((Date.now() - data.gameStartedAt) / 1000 - CLOCK_OFFSET_SEC);
   } else {
     stopGameClock();
   }
