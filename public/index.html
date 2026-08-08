@@ -10,38 +10,118 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/space-grotesk-700-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />
+  <!-- Marks that scripting is available before first paint, so the
+       scroll-reveal states only hide content we can actually reveal again. -->
+  <script>document.documentElement.className += " js";</script>
 </head>
 <body>
-  <div class="space" aria-hidden="true">
-    <div class="nebula"></div>
-    <div class="stars stars--far"></div>
-    <div class="stars stars--mid"></div>
-    <div class="stars stars--near"></div>
-    <span class="shooting-star shooting-star--a"></span>
-    <span class="shooting-star shooting-star--b"></span>
-    <div class="planet-giant">
-      <div class="planet-giant__ring"></div>
-      <div class="planet-giant__body"></div>
+  <!-- Moonlit storm backdrop. Layers run back to front; each one that moves
+       drives only transform/opacity so the compositor handles it. Elements
+       with data-parallax are translated on scroll by the factor given. -->
+  <div class="sky" aria-hidden="true">
+    <div class="sky__wash"></div>
+    <div class="sky__swirl"></div>
+
+    <div class="sky__layer" data-parallax="0.05">
+      <div class="stars stars--far"></div>
     </div>
-    <div class="planet-moon"></div>
-    <div class="planet-small"></div>
+    <div class="sky__layer" data-parallax="0.11">
+      <div class="stars stars--mid"></div>
+    </div>
+    <div class="sky__layer" data-parallax="0.19">
+      <div class="stars stars--near"></div>
+    </div>
+
+    <div class="sky__layer" data-parallax="0.08">
+      <div class="moon">
+        <span class="moon__corona"></span>
+        <span class="moon__disc"></span>
+      </div>
+    </div>
+
+    <span class="flash flash--a"></span>
+    <span class="flash flash--b"></span>
+
+    <!-- Storm ceiling: the same bumpy bank flipped so its edge hangs down. -->
+    <div class="sky__layer" data-parallax="-0.06">
+      <svg class="clouds clouds--ceiling" viewBox="-60 0 1465 280" preserveAspectRatio="xMidYMin slice">
+        <path d="M-60.0,280.0 L-60.0,143.8 C-45.2,34.6 48.6,23.4 63.5,132.6 C85.5,53.7 225.5,73.8 247.6,152.8 C267.8,47.2 396.4,59.1 416.6,164.6 C434.8,103.5 549.5,71.0 567.6,132.1 C581.5,69.5 668.9,95.5 682.8,158.0 C706.3,36.1 855.7,3.8 879.3,125.7 C893.9,54.2 986.2,90.2 1000.8,161.8 C1022.5,45.7 1160.4,14.3 1182.2,130.4 C1208.9,60.8 1377.9,57.1 1404.6,126.8 L1404.6,280.0Z" />
+      </svg>
+    </div>
+
+    <div class="sky__layer" data-parallax="0.14">
+      <svg class="clouds clouds--far" viewBox="-60 0 1390 280" preserveAspectRatio="xMidYMax slice">
+        <path d="M-60.0,280.0 L-60.0,166.8 C-51.7,133.2 1.1,150.2 9.5,183.8 C19.9,147.5 86.0,116.7 96.4,153.0 C107.5,120.9 177.8,121.5 188.9,153.6 C203.8,111.7 298.3,114.5 313.3,156.4 C329.4,97.5 431.4,121.0 447.5,180.0 C454.8,147.3 501.2,161.9 508.5,194.6 C516.5,144.0 567.3,115.4 575.3,166.0 C587.8,119.9 667.2,137.0 679.8,183.2 C687.3,140.8 734.6,110.7 742.1,153.1 C753.1,101.2 823.0,114.4 834.1,166.3 C843.9,117.3 905.9,142.2 915.7,191.3 C928.1,117.4 1007.1,103.4 1019.5,177.3 C1029.2,144.3 1090.5,168.0 1100.2,201.0 C1114.4,165.1 1204.6,122.0 1218.9,157.9 C1232.3,93.1 1317.0,124.9 1330.4,189.8 L1330.4,280.0Z" />
+      </svg>
+    </div>
+
+    <div class="sky__layer" data-parallax="0.24">
+      <svg class="clouds clouds--near" viewBox="-60 0 1383 280" preserveAspectRatio="xMidYMax slice">
+        <path d="M-60.0,280.0 L-60.0,180.1 C-39.1,137.2 93.6,135.5 114.6,178.4 C128.9,143.1 219.4,124.3 233.7,159.6 C248.3,115.6 340.5,99.5 355.1,143.5 C365.1,83.5 428.5,108.9 438.5,168.9 C456.8,123.0 572.2,104.8 590.5,150.7 C606.9,59.9 710.7,75.4 727.1,166.2 C740.6,107.1 826.3,112.4 839.8,171.5 C857.1,131.3 966.6,108.2 983.9,148.3 C1002.0,82.1 1116.1,96.4 1134.1,162.7 C1145.4,98.3 1216.5,76.9 1227.8,141.3 C1239.2,111.2 1311.4,107.9 1322.8,137.9 L1322.8,280.0Z" />
+      </svg>
+    </div>
+
+    <!-- Undergrowth rising from the foot of the page, in front of the near
+         cloudbank so it reads as the closest thing in the scene. -->
+    <div class="sky__layer" data-parallax="0.2">
+      <div class="branch branch--bl">
+        <i class="branch__limbs"></i><i class="branch__blossoms"></i>
+      </div>
+      <div class="branch branch--br">
+        <i class="branch__limbs"></i><i class="branch__blossoms"></i>
+      </div>
+    </div>
+
+    <!-- Ink branches framing the top corners, as in the reference art. Limbs
+         and blossoms are separate layers so the blossoms can carry a larger
+         sway than the limbs beneath them -- that offset is the rustle. -->
+    <div class="sky__layer" data-parallax="-0.12">
+      <div class="branch branch--tl">
+        <i class="branch__limbs"></i><i class="branch__blossoms"></i>
+      </div>
+      <div class="branch branch--tr">
+        <i class="branch__limbs"></i><i class="branch__blossoms"></i>
+      </div>
+    </div>
+
+    <div class="petals">
+      <i style="--x: 6vw;  --dur: 19s; --delay: 0s;    --s: 0.7"></i>
+      <i style="--x: 18vw; --dur: 26s; --delay: -6s;   --s: 1"></i>
+      <i style="--x: 31vw; --dur: 22s; --delay: -13s;  --s: 0.5"></i>
+      <i style="--x: 44vw; --dur: 30s; --delay: -3s;   --s: 0.85"></i>
+      <i style="--x: 57vw; --dur: 24s; --delay: -17s;  --s: 0.6"></i>
+      <i style="--x: 69vw; --dur: 28s; --delay: -9s;   --s: 1.1"></i>
+      <i style="--x: 82vw; --dur: 21s; --delay: -21s;  --s: 0.65"></i>
+      <i style="--x: 93vw; --dur: 33s; --delay: -14s;  --s: 0.9"></i>
+    </div>
+
+    <div class="vignette"></div>
   </div>
 
-  <header class="site-header">
-    <div class="brand">
-      <span class="brand-mark">✦</span>
-      <span class="brand-name">GrandpaChang</span>
+  <!-- Click rings are drawn here so they can appear anywhere on the page
+       without touching the layout of whatever was clicked. -->
+  <div id="fx" class="fx" aria-hidden="true"></div>
+  <div id="scroll-progress" class="scroll-progress" aria-hidden="true"></div>
+
+  <!-- Sticky bar spans the full width so its blur reaches both edges; the
+       inner wrapper carries the same max-width as <main>. -->
+  <header class="site-header" id="site-header">
+    <div class="site-header__inner">
+      <div class="brand">
+        <span class="brand-mark">✦</span>
+        <span class="brand-name">GrandpaChang</span>
+      </div>
+      <nav class="header-links" aria-label="Primary">
+        <a class="twitch-link" href="#about">About</a>
+        <a class="twitch-link" href="#socials">Socials</a>
+        <a class="twitch-link" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">
+          Twitch ↗
+        </a>
+        <a class="twitch-link" href="https://itzon.tv/grandpachang" target="_blank" rel="noopener">
+          ITZon ↗
+        </a>
+      </nav>
     </div>
-    <nav class="header-links" aria-label="Primary">
-      <a class="twitch-link" href="#about">About</a>
-      <a class="twitch-link" href="#socials">Socials</a>
-      <a class="twitch-link" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">
-        Twitch ↗
-      </a>
-      <a class="twitch-link" href="https://itzon.tv/grandpachang" target="_blank" rel="noopener">
-        ITZon ↗
-      </a>
-    </nav>
   </header>
 
   <main>
@@ -158,7 +238,9 @@
         </div>
 
         <div id="league-matchup" class="league-section is-hidden">
-          <span class="league-label" id="league-matchup-label">Matchup</span>
+          <span class="league-label">Your team</span>
+          <div id="league-ally-body" class="league-iconrow"></div>
+          <span class="league-label league-label--spaced">Enemy team</span>
           <div id="league-matchup-body" class="league-iconrow"></div>
         </div>
 
@@ -173,7 +255,7 @@
       <h1>GrandpaChang's Live Streams</h1>
     </section>
 
-    <section class="vods-section">
+    <section class="vods-section reveal" data-reveal>
       <h2>Recent VODs</h2>
       <div class="vods-carousel">
         <button type="button" id="vods-prev" class="vods-nav vods-nav--prev" aria-label="Scroll to previous VODs">‹</button>
@@ -205,7 +287,7 @@
       <div id="vods-status" class="vods-status is-hidden"></div>
     </section>
 
-    <section id="about" class="about-section">
+    <section id="about" class="about-section reveal" data-reveal>
       <div class="about__avatar" id="about-avatar">
         <img src="avatar.jpg" alt="GrandpaChang" id="about-avatar-img" width="160" height="160" loading="lazy" />
       </div>
@@ -216,7 +298,7 @@
       </div>
     </section>
 
-    <section id="socials" class="socials-section">
+    <section id="socials" class="socials-section reveal" data-reveal>
       <h2>Find me elsewhere</h2>
       <div class="socials-row">
         <a class="social-link" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">

@@ -401,8 +401,8 @@ const leagueMain = document.getElementById("league-main");
 const leagueSpells = document.getElementById("league-spells");
 const leagueSide = document.getElementById("league-side");
 const leagueMatchup = document.getElementById("league-matchup");
-const leagueMatchupLabel = document.getElementById("league-matchup-label");
 const leagueMatchupBody = document.getElementById("league-matchup-body");
+const leagueAllyBody = document.getElementById("league-ally-body");
 const leagueBans = document.getElementById("league-bans");
 const leagueBansBody = document.getElementById("league-bans-body");
 
@@ -457,6 +457,15 @@ function championImg(champ, cls) {
   img.loading = "lazy";
   if (cls) img.className = cls;
   return img;
+}
+
+// Fills one team row. The player's own pick gets a marker class so it stands
+// out from the other four without needing a separate legend.
+function renderLineup(target, champs) {
+  target.replaceChildren();
+  for (const c of champs) {
+    target.appendChild(championImg(c, c.isMe ? "league-me" : null));
+  }
 }
 
 function setLeagueOpen(open) {
@@ -546,25 +555,13 @@ function renderInGame(data) {
 
   leagueMain.classList.remove("is-hidden");
 
-  // Matchup: the opponent pairing is inferred from champ-select order, so
-  // fall back to showing the whole enemy team when there's no pairing.
-  leagueMatchupBody.replaceChildren();
-  if (data.opponent) {
-    leagueMatchupLabel.textContent = "Likely matchup";
-    if (data.champion) leagueMatchupBody.appendChild(championImg(data.champion));
-    const vs = document.createElement("span");
-    vs.className = "league-vs";
-    vs.textContent = "vs";
-    leagueMatchupBody.appendChild(vs);
-    leagueMatchupBody.appendChild(championImg(data.opponent));
-    leagueMatchup.classList.remove("is-hidden");
-  } else if ((data.enemyTeam || []).length) {
-    leagueMatchupLabel.textContent = "Enemy team";
-    for (const c of data.enemyTeam) leagueMatchupBody.appendChild(championImg(c));
-    leagueMatchup.classList.remove("is-hidden");
-  } else {
-    leagueMatchup.classList.add("is-hidden");
-  }
+  // Both full line-ups, rather than a guessed lane pairing. The player's own
+  // champion is marked so they can find themselves in their team's row.
+  const allies = data.allyTeam || [];
+  const enemies = data.enemyTeam || [];
+  renderLineup(leagueAllyBody, allies);
+  renderLineup(leagueMatchupBody, enemies);
+  leagueMatchup.classList.toggle("is-hidden", !allies.length && !enemies.length);
 
   leagueBansBody.replaceChildren();
   if ((data.bans || []).length) {
@@ -609,6 +606,8 @@ function renderPostGame(data) {
   }
 
   leagueSpells.replaceChildren();
+  leagueAllyBody.replaceChildren();
+  leagueMatchupBody.replaceChildren();
   leagueMain.classList.remove("is-hidden");
   leagueMatchup.classList.add("is-hidden");
   leagueBans.classList.add("is-hidden");
@@ -622,10 +621,118 @@ function renderIdle() {
   leagueSide.className = "league-side";
   leagueIcon.removeAttribute("src");
   leagueSpells.replaceChildren();
+  leagueAllyBody.replaceChildren();
+  leagueMatchupBody.replaceChildren();
   leagueMain.classList.add("is-hidden");
   leagueMatchup.classList.add("is-hidden");
   leagueBans.classList.add("is-hidden");
 }
+
+// ---------------------------------------------------------------------------
+// Motion: scroll reveal, backdrop parallax, scroll progress, click rings.
+// All of it is decorative, so every piece degrades to "no movement" rather
+// than to "no content" -- and the whole block is skipped for visitors who
+// have asked for reduced motion.
+// ---------------------------------------------------------------------------
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+// Reveal on scroll. Runs even under reduced motion so the headings' underline
+// state still lands; the CSS simply removes the movement.
+const revealTargets = document.querySelectorAll("[data-reveal]");
+if ("IntersectionObserver" in window) {
+  const revealObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("is-visible");
+        // One-shot: sections don't re-hide when scrolled back past.
+        revealObserver.unobserve(entry.target);
+      }
+    },
+    { rootMargin: "0px 0px -12% 0px", threshold: 0.08 }
+  );
+  revealTargets.forEach((el) => revealObserver.observe(el));
+} else {
+  revealTargets.forEach((el) => el.classList.add("is-visible"));
+}
+
+// Scroll-driven work, batched into one rAF pass so several listeners can't
+// each force their own layout read on the same frame.
+const parallaxLayers = Array.from(document.querySelectorAll("[data-parallax]")).map(
+  (el) => ({ el, factor: parseFloat(el.dataset.parallax) || 0 })
+);
+const scrollProgress = document.getElementById("scroll-progress");
+const siteHeader = document.getElementById("site-header");
+
+// Keeps distant layers from wandering far off screen on a long page.
+const PARALLAX_LIMIT_PX = 180;
+let scrollTicking = false;
+
+function onScrollFrame() {
+  scrollTicking = false;
+  const y = window.scrollY || window.pageYOffset || 0;
+
+  if (scrollProgress) {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const ratio = max > 0 ? Math.min(1, Math.max(0, y / max)) : 0;
+    scrollProgress.style.transform = `scaleX(${ratio})`;
+  }
+
+  if (siteHeader) siteHeader.classList.toggle("is-stuck", y > 8);
+
+  if (!reducedMotion.matches) {
+    for (const { el, factor } of parallaxLayers) {
+      const offset = Math.max(
+        -PARALLAX_LIMIT_PX,
+        Math.min(PARALLAX_LIMIT_PX, -y * factor)
+      );
+      el.style.transform = `translate3d(0, ${offset.toFixed(1)}px, 0)`;
+    }
+  }
+}
+
+function requestScrollFrame() {
+  if (scrollTicking) return;
+  scrollTicking = true;
+  requestAnimationFrame(onScrollFrame);
+}
+
+window.addEventListener("scroll", requestScrollFrame, { passive: true });
+window.addEventListener("resize", requestScrollFrame, { passive: true });
+onScrollFrame();
+
+// Drop the parallax offsets if the preference is turned on mid-session,
+// otherwise the layers would freeze wherever they happened to be.
+reducedMotion.addEventListener("change", () => {
+  if (reducedMotion.matches) {
+    for (const { el } of parallaxLayers) el.style.transform = "";
+  }
+  requestScrollFrame();
+});
+
+// Click ring. Drawn in a fixed overlay rather than inside the clicked
+// element, so it works over any control without touching its layout.
+const fxLayer = document.getElementById("fx");
+const MAX_RINGS = 6;
+
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (!fxLayer || reducedMotion.matches) return;
+    // Primary button / touch only, and never for synthesised events.
+    if (e.button !== 0 || !e.isTrusted) return;
+    while (fxLayer.childElementCount >= MAX_RINGS) {
+      fxLayer.removeChild(fxLayer.firstElementChild);
+    }
+    const ring = document.createElement("span");
+    ring.className = "fx__ring";
+    ring.style.left = `${e.clientX}px`;
+    ring.style.top = `${e.clientY}px`;
+    ring.addEventListener("animationend", () => ring.remove(), { once: true });
+    fxLayer.appendChild(ring);
+  },
+  { passive: true }
+);
 
 let isChatLoaded = false;
 function loadChat() {

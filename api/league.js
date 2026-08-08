@@ -258,16 +258,20 @@ module.exports = async (req, res) => {
       // A new game invalidates any cached post-game result.
       postGameCache = null;
 
+      // Both full line-ups. Spectator-V5 carries no lane or role field, so
+      // any per-lane pairing would be inference dressed up as fact -- the
+      // sites that do show positions build them from their own match-history
+      // models, not from this endpoint. Showing all ten picks is simply true.
       const myTeam = me.teamId;
-      const allies = (game.participants || []).filter((p) => p.teamId === myTeam);
-      const enemies = (game.participants || []).filter((p) => p.teamId !== myTeam);
+      const participants = game.participants || [];
+      const allies = participants.filter((p) => p.teamId === myTeam);
+      const enemies = participants.filter((p) => p.teamId !== myTeam);
 
-      // Riot returns participants in champ-select order, which usually lines
-      // up by role between teams -- so the same index on the other team is
-      // the likely lane opponent. It's a heuristic, not authoritative, and it
-      // breaks down in blind pick and ARAM.
-      const myIndex = allies.findIndex((p) => p.puuid === me.puuid);
-      const opponent = myIndex >= 0 && enemies[myIndex] ? enemies[myIndex] : null;
+      const lineup = (list) =>
+        list.map((p) => ({
+          ...championPayload(idx, p.championId),
+          isMe: p.puuid === me.puuid,
+        }));
 
       res.setHeader("Cache-Control", "s-maxage=15");
       res.status(200).json({
@@ -281,9 +285,8 @@ module.exports = async (req, res) => {
         gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
         side: myTeam === 100 ? "Blue" : "Red",
         spells: [spellPayload(idx, me.spell1Id), spellPayload(idx, me.spell2Id)].filter(Boolean),
-        opponent: opponent ? championPayload(idx, opponent.championId) : null,
-        opponentInferred: Boolean(opponent),
-        enemyTeam: enemies.map((p) => championPayload(idx, p.championId)),
+        allyTeam: lineup(allies),
+        enemyTeam: lineup(enemies),
         bans: (game.bannedChampions || [])
           .filter((b) => b.championId > 0)
           .map((b) => championPayload(idx, b.championId)),

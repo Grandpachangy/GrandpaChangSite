@@ -18,16 +18,33 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Moonlit violet palette: near-black plum ground, moonlight for text, violet
+   as the working accent, magenta for the electric highlights, and crimson
+   held back exclusively for the live/defeat states so it keeps its urgency. */
 :root {
-  --bg-deep: #05060f;
-  --bg-mid: #0b0e20;
-  --accent: #8b7bff;
-  --accent-soft: #5eead4;
-  --text: #e8e9f5;
-  --text-dim: #8d91b0;
-  --card-bg: rgba(255, 255, 255, 0.03);
-  --card-border: rgba(255, 255, 255, 0.07);
-  --live-red: #ff5470;
+  --void: #07040d;
+  --deep: #0d0718;
+  --plum: #1a0f2e;
+  --plum-hi: #251642;
+
+  --violet: #a06bff;
+  --violet-soft: #c8a6ff;
+  --magenta: #e05cff;
+
+  --moon: #ece6ff;
+  --moon-dim: #9b90bd;
+
+  --live-red: #ff3b5c;
+  --win: #4ade80;
+
+  --surface: rgba(26, 15, 46, 0.66);
+  --surface-hi: rgba(37, 22, 66, 0.82);
+  --edge: rgba(180, 140, 255, 0.14);
+  --edge-hi: rgba(200, 165, 255, 0.45);
+  --glow: rgba(160, 107, 255, 0.28);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
 }
 
 * {
@@ -40,20 +57,28 @@ html, body {
   min-height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: radial-gradient(ellipse at top, var(--bg-mid) 0%, var(--bg-deep) 55%, #020207 100%);
-  color: var(--text);
+  /* Moonglow in the upper right, falling away to near-black at the foot of
+     the page -- the light direction the reference art shares. */
+  background:
+    radial-gradient(115% 75% at 76% 2%, #4c2f80 0%, #2d1a4f 26%, #170d2b 58%, #0b0616 80%, var(--void) 100%);
+  background-attachment: fixed;
+  color: var(--moon);
   font-family: "Inter", system-ui, sans-serif;
   position: relative;
   overflow-x: hidden;
 }
 
-/* ---------- Animated space backdrop ----------
-   Every animation here drives only `transform` or `opacity`, so the
-   compositor handles them without repainting or reflowing the page.
-   Each star layer tiles at a fixed pixel size and travels exactly one
-   tile height per cycle, which makes the loop seamless.            */
-.space {
+/* ============================================================
+   Backdrop: moonlit storm
+   Every animated property here is transform or opacity, so the
+   compositor handles the scene without repainting the page.
+   ============================================================ */
+.sky {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -61,6 +86,62 @@ body {
   overflow: hidden;
 }
 
+/* Parallax wrappers. JS writes transform here; the visual child keeps its
+   own CSS animation, so the two never fight over the same property. */
+.sky__layer {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.sky__wash {
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(closest-side circle at 72% 16%, rgba(200, 166, 255, 0.2), transparent),
+    radial-gradient(closest-side circle at 22% 62%, rgba(160, 107, 255, 0.16), transparent),
+    radial-gradient(closest-side circle at 58% 88%, rgba(224, 92, 255, 0.1), transparent);
+  filter: blur(40px);
+  animation: wash-drift 54s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes wash-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(2%, 2%, 0) scale(1.14); }
+}
+
+/* Slow swirl, echoing the vortex in the reference art. Kept very low
+   contrast so it reads as movement in the sky rather than a shape. */
+.sky__swirl {
+  position: absolute;
+  top: -30vh;
+  right: -20vw;
+  width: 90vw;
+  height: 90vw;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      rgba(160, 107, 255, 0.07) 40deg,
+      transparent 90deg,
+      rgba(224, 92, 255, 0.05) 160deg,
+      transparent 220deg,
+      rgba(180, 140, 255, 0.06) 300deg,
+      transparent 360deg
+    );
+  filter: blur(40px);
+  animation: swirl 140s linear infinite;
+  will-change: transform;
+}
+
+@keyframes swirl {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Stars ---------- */
 .stars {
   position: absolute;
   left: 0;
@@ -74,11 +155,11 @@ body {
   height: calc(100% + 300px);
   background-size: 300px 300px;
   background-image:
-    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.55), transparent),
-    radial-gradient(1px 1px at 65% 15%, rgba(255, 255, 255, 0.45), transparent),
-    radial-gradient(1px 1px at 40% 70%, rgba(255, 255, 255, 0.4), transparent),
-    radial-gradient(1px 1px at 88% 55%, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1px 1px at 10% 88%, rgba(255, 255, 255, 0.4), transparent);
+    radial-gradient(1px 1px at 20% 30%, rgba(236, 230, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 65% 15%, rgba(200, 166, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 40% 70%, rgba(236, 230, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 88% 55%, rgba(236, 230, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 10% 88%, rgba(200, 166, 255, 0.35), transparent);
   animation: drift-300 150s linear infinite, twinkle-soft 9s ease-in-out infinite alternate;
 }
 
@@ -86,11 +167,11 @@ body {
   height: calc(100% + 400px);
   background-size: 400px 400px;
   background-image:
-    radial-gradient(1.4px 1.4px at 30% 20%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(1.2px 1.2px at 75% 45%, rgba(210, 225, 255, 0.65), transparent),
-    radial-gradient(1.4px 1.4px at 15% 60%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1.2px 1.2px at 55% 85%, rgba(255, 255, 255, 0.55), transparent),
-    radial-gradient(1.4px 1.4px at 92% 78%, rgba(200, 220, 255, 0.6), transparent);
+    radial-gradient(1.4px 1.4px at 30% 20%, rgba(236, 230, 255, 0.7), transparent),
+    radial-gradient(1.2px 1.2px at 75% 45%, rgba(224, 92, 255, 0.45), transparent),
+    radial-gradient(1.4px 1.4px at 15% 60%, rgba(236, 230, 255, 0.55), transparent),
+    radial-gradient(1.2px 1.2px at 55% 85%, rgba(200, 166, 255, 0.5), transparent),
+    radial-gradient(1.4px 1.4px at 92% 78%, rgba(236, 230, 255, 0.55), transparent);
   animation: drift-400 95s linear infinite, twinkle-soft 6s ease-in-out infinite alternate;
 }
 
@@ -98,10 +179,10 @@ body {
   height: calc(100% + 500px);
   background-size: 500px 500px;
   background-image:
-    radial-gradient(2px 2px at 25% 35%, rgba(255, 255, 255, 0.95), transparent),
-    radial-gradient(1.8px 1.8px at 70% 12%, rgba(190, 210, 255, 0.85), transparent),
-    radial-gradient(2px 2px at 45% 72%, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(1.8px 1.8px at 90% 62%, rgba(230, 220, 255, 0.8), transparent);
+    radial-gradient(2px 2px at 25% 35%, rgba(236, 230, 255, 0.9), transparent),
+    radial-gradient(1.8px 1.8px at 70% 12%, rgba(200, 166, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 45% 72%, rgba(236, 230, 255, 0.75), transparent),
+    radial-gradient(1.8px 1.8px at 90% 62%, rgba(224, 92, 255, 0.6), transparent);
   animation: drift-500 60s linear infinite, twinkle-bright 4.5s ease-in-out infinite alternate;
 }
 
@@ -121,202 +202,433 @@ body {
 }
 
 @keyframes twinkle-soft {
-  from { opacity: 0.5; }
-  to { opacity: 0.85; }
+  from { opacity: 0.45; }
+  to { opacity: 0.8; }
 }
 
 @keyframes twinkle-bright {
-  from { opacity: 0.65; }
+  from { opacity: 0.6; }
   to { opacity: 1; }
 }
 
-/* Slow-moving colour wash, keeps the background from feeling flat. */
-.nebula {
+/* ---------- Moon ---------- */
+.moon {
   position: absolute;
-  inset: -20%;
-  background:
-    radial-gradient(closest-side circle at 25% 30%, rgba(139, 123, 255, 0.16), transparent),
-    radial-gradient(closest-side circle at 75% 65%, rgba(94, 234, 212, 0.1), transparent),
-    radial-gradient(closest-side circle at 55% 15%, rgba(180, 120, 255, 0.09), transparent);
-  filter: blur(30px);
-  animation: nebula-drift 48s ease-in-out infinite alternate;
+  /* High and hard right, so it rises behind the corner branch instead of
+     being swallowed by the player/chat panels below it. */
+  top: -2vh;
+  right: 3vw;
+  width: 170px;
+  height: 170px;
+  animation: moon-breathe 26s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-@keyframes nebula-drift {
-  from { transform: translate3d(-2%, -1%, 0) scale(1); }
-  to { transform: translate3d(2%, 2%, 0) scale(1.12); }
+@keyframes moon-breathe {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(0, -14px, 0) scale(1.03); }
 }
 
-/* Occasional shooting star: visible for a short slice of a long cycle. */
-.shooting-star {
+.moon__corona {
   position: absolute;
-  width: 140px;
-  height: 1.5px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.9));
+  top: 50%;
+  left: 50%;
+  width: 460px;
+  height: 460px;
+  margin: -230px 0 0 -230px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(236, 230, 255, 0.46) 0%,
+    rgba(200, 166, 255, 0.22) 30%,
+    rgba(160, 107, 255, 0.09) 54%,
+    transparent 74%
+  );
+  animation: corona-pulse 11s ease-in-out infinite alternate;
+  will-change: opacity, transform;
+}
+
+@keyframes corona-pulse {
+  from { opacity: 0.75; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1.06); }
+}
+
+.moon__disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 62% 66%, rgba(150, 130, 200, 0.28) 0%, transparent 12%),
+    radial-gradient(circle at 38% 34%, rgba(150, 130, 200, 0.22) 0%, transparent 9%),
+    radial-gradient(circle at 55% 26%, rgba(150, 130, 200, 0.18) 0%, transparent 7%),
+    radial-gradient(circle at 30% 62%, rgba(150, 130, 200, 0.2) 0%, transparent 8%),
+    radial-gradient(circle at 42% 40%, #ffffff 0%, #efeaff 42%, #cdbdf5 78%, #a892e0 100%);
+  box-shadow: 0 0 70px rgba(236, 230, 255, 0.42), 0 0 160px rgba(160, 107, 255, 0.28);
+}
+
+/* ---------- Cloudbanks ---------- */
+/* Each bank is wider than the viewport and eases back and forth, so the
+   churn never reveals an end of the path. */
+.clouds {
+  position: absolute;
+  left: -20%;
+  width: 140%;
+  will-change: transform;
+}
+
+.clouds path {
+  fill: currentColor;
+}
+
+/* Storm ceiling, flipped so the bumpy edge hangs downward. */
+.clouds--ceiling {
+  top: 0;
+  height: 26vh;
+  color: #33254f;
+  opacity: 0.8;
+  transform: scaleY(-1);
+  animation: churn-ceiling 78s ease-in-out infinite alternate;
+}
+
+@keyframes churn-ceiling {
+  from { transform: scaleY(-1) translate3d(-3%, 0, 0); }
+  to { transform: scaleY(-1) translate3d(3%, 0, 0); }
+}
+
+.clouds--far {
+  bottom: 0;
+  height: 32vh;
+  color: #2b1a4d;
+  opacity: 0.62;
+  animation: churn-far 96s ease-in-out infinite alternate;
+}
+
+@keyframes churn-far {
+  from { transform: translate3d(3%, 0, 0); }
+  to { transform: translate3d(-3%, 0, 0); }
+}
+
+.clouds--near {
+  bottom: 0;
+  height: 24vh;
+  color: #241542;
+  opacity: 0.92;
+  animation: churn-near 64s ease-in-out infinite alternate;
+}
+
+@keyframes churn-near {
+  from { transform: translate3d(-4%, 0, 0); }
+  to { transform: translate3d(4%, 0, 0); }
+}
+
+/* ---------- Distant lightning ---------- */
+/* Sheet lightning rather than a drawn bolt: a wide magenta bloom that
+   flickers for a fraction of a long cycle, so it stays an accent. */
+.flash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40vh;
   opacity: 0;
+  will-change: opacity;
+}
+
+.flash--a {
+  top: 0;
+  background: radial-gradient(ellipse at 68% 0%, rgba(224, 92, 255, 0.5), rgba(160, 107, 255, 0.16) 42%, transparent 68%);
+  animation: sheet 31s linear infinite;
+}
+
+.flash--b {
+  top: 4vh;
+  background: radial-gradient(ellipse at 24% 0%, rgba(200, 166, 255, 0.4), rgba(160, 107, 255, 0.12) 40%, transparent 66%);
+  animation: sheet 47s linear infinite 18s;
+}
+
+@keyframes sheet {
+  0%, 100% { opacity: 0; }
+  0.6% { opacity: 0.75; }
+  1.2% { opacity: 0.1; }
+  1.8% { opacity: 0.6; }
+  3.2% { opacity: 0; }
+}
+
+/* ---------- Drifting petals ---------- */
+.petals i {
+  position: absolute;
+  top: -6vh;
+  left: var(--x, 50vw);
+  width: 7px;
+  height: 9px;
+  border-radius: 60% 40% 55% 45%;
+  background: linear-gradient(140deg, var(--violet-soft), var(--magenta));
+  opacity: 0;
+  transform: scale(var(--s, 1));
+  animation: petal-fall var(--dur, 24s) linear var(--delay, 0s) infinite;
   will-change: transform, opacity;
 }
 
-.shooting-star--a {
-  top: 12%;
-  left: -160px;
-  animation: shoot 17s linear infinite;
+@keyframes petal-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(var(--s, 1)); opacity: 0; }
+  8% { opacity: 0.55; }
+  85% { opacity: 0.4; }
+  100% { transform: translate3d(-13vw, 112vh, 0) rotate(420deg) scale(var(--s, 1)); opacity: 0; }
 }
 
-.shooting-star--b {
-  top: 38%;
-  left: -160px;
-  animation: shoot 23s linear infinite 9s;
-}
-
-@keyframes shoot {
-  0% { transform: translate3d(0, 0, 0) rotate(18deg); opacity: 0; }
-  1% { opacity: 0.9; }
-  7% { transform: translate3d(90vw, 30vh, 0) rotate(18deg); opacity: 0; }
-  100% { transform: translate3d(90vw, 30vh, 0) rotate(18deg); opacity: 0; }
-}
-
-/* ---------- Planets ----------
-   Ringed gas giant, cratered moon, and a small teal world, per the
-   Claude Design "Dark space theme website design" project.           */
-.planet-giant {
+/* ---------- Corner branches ---------- */
+/* Ink silhouettes, faded out at their far end with a mask so they dissolve
+   into the sky instead of ending on a hard edge.
+   Each branch stacks two registered layers sharing one viewBox: the limbs,
+   and the blossoms that sit at their tips. Both rotate about the branch's
+   anchoring corner, but the blossoms swing wider and on a different cycle,
+   so the tips drift a couple of pixels against the wood they hang from --
+   which is what reads as a rustle, rather than the whole thing waving. */
+.branch {
   position: absolute;
-  top: 5%;
-  right: -90px;
-  width: 340px;
-  height: 340px;
-}
-
-.planet-giant__ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 400px;
-  height: 88px;
-  border: solid rgba(230, 225, 255, 0.55);
-  border-width: 4px 0;
-  border-radius: 50%;
-  opacity: 0.6;
-  animation: ring-spin 90s linear infinite;
+  opacity: 0.95;
+  animation: rustle var(--rustle-dur, 15s) ease-in-out var(--rustle-delay, 0s) infinite;
   will-change: transform;
 }
 
-.planet-giant__body {
+.branch__limbs,
+.branch__blossoms {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 240px;
+  inset: 0;
+}
+
+.branch__limbs {
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: var(--limbs);
+}
+
+/* The blossom SVG masks a violet wash rather than being painted flat black.
+   Black-on-near-black made the branches disappear, and the reference art has
+   lit blossoms on a dark tree anyway. */
+.branch__blossoms {
+  background: linear-gradient(150deg, var(--violet-soft), var(--magenta));
+  -webkit-mask-image: var(--blossoms);
+  mask-image: var(--blossoms);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  /* Explicitly inherits the pivot set on the parent branch, so the blossom
+     swing hinges at the same corner the limbs do. */
+  transform-origin: inherit;
+  animation: rustle-tips var(--tips-dur, 9s) ease-in-out var(--rustle-delay, 0s) infinite;
+  will-change: transform;
+}
+
+.branch--tl {
+  --limbs: url("/branch-tl-limbs.svg");
+  --blossoms: url("/branch-tl-blossoms.svg");
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 286px;
+  transform-origin: top left;
+  --rustle-dur: 15s;
+  --tips-dur: 9s;
+  -webkit-mask-image: linear-gradient(to bottom right, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom right, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+}
+
+
+.branch--tr {
+  --limbs: url("/branch-tr-limbs.svg");
+  --blossoms: url("/branch-tr-blossoms.svg");
+  top: 0;
+  right: 0;
+  width: 262px;
   height: 240px;
-  border-radius: 50%;
-  box-shadow: 0 0 90px rgba(139, 123, 255, 0.35), inset -22px -22px 55px rgba(0, 0, 0, 0.45);
-  background-image:
-    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.4), transparent 22%),
-    repeating-linear-gradient(
-      178deg,
-      rgba(255, 255, 255, 0.08) 0px, rgba(255, 255, 255, 0.08) 8px,
-      transparent 8px, transparent 20px,
-      rgba(0, 0, 0, 0.08) 20px, rgba(0, 0, 0, 0.08) 27px
-    ),
-    radial-gradient(circle at 40% 35%, #c9beff 0%, #9b8bff 22%, #6f5fe0 46%, #4a3f9e 72%, #241f52 100%);
-  animation: giant-bob-spin 70s ease-in-out infinite;
-  will-change: transform;
+  transform-origin: top right;
+  --rustle-dur: 18s;
+  --tips-dur: 11s;
+  --rustle-delay: -6s;
+  -webkit-mask-image: linear-gradient(to bottom left, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom left, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
 }
 
-.planet-moon {
+
+.branch--bl {
+  --limbs: url("/branch-bl-limbs.svg");
+  --blossoms: url("/branch-bl-blossoms.svg");
+  bottom: 0;
+  left: 0;
+  width: 262px;
+  height: 277px;
+  transform-origin: bottom left;
+  --rustle-dur: 13s;
+  --tips-dur: 8s;
+  --rustle-delay: -3s;
+  -webkit-mask-image: linear-gradient(to top right, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+  mask-image: linear-gradient(to top right, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+}
+
+
+.branch--br {
+  --limbs: url("/branch-br-limbs.svg");
+  --blossoms: url("/branch-br-blossoms.svg");
+  bottom: 0;
+  right: 0;
+  width: 234px;
+  height: 218px;
+  transform-origin: bottom right;
+  --rustle-dur: 16s;
+  --tips-dur: 10s;
+  --rustle-delay: -9s;
+  -webkit-mask-image: linear-gradient(to top left, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+  mask-image: linear-gradient(to top left, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
+}
+
+
+/* Irregular on purpose -- an even back-and-forth reads as a metronome, not
+   wind. The larger step near 63% is a gust. 0% and 100% match so it loops. */
+@keyframes rustle {
+  0%, 100% { transform: rotate(-0.4deg); }
+  14% { transform: rotate(0.22deg); }
+  27% { transform: rotate(-0.16deg); }
+  41% { transform: rotate(0.46deg); }
+  55% { transform: rotate(-0.3deg); }
+  63% { transform: rotate(1deg); }
+  69% { transform: rotate(-0.42deg); }
+  75% { transform: rotate(0.7deg); }
+  86% { transform: rotate(-0.2deg); }
+}
+
+@keyframes rustle-tips {
+  0%, 100% { transform: rotate(0.5deg); }
+  17% { transform: rotate(-0.35deg); }
+  33% { transform: rotate(0.62deg); }
+  48% { transform: rotate(-0.5deg); }
+  61% { transform: rotate(0.9deg); }
+  72% { transform: rotate(-0.66deg); }
+  88% { transform: rotate(0.3deg); }
+}
+
+/* Darkens the page edges so content in the middle holds attention. */
+.vignette {
   position: absolute;
-  bottom: 6%;
-  left: -50px;
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  opacity: 0.85;
-  box-shadow: 0 0 50px rgba(139, 123, 255, 0.2), inset -16px -16px 32px rgba(0, 0, 0, 0.45);
-  background-image:
-    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.35) 0%, transparent 9%),
-    radial-gradient(circle at 66% 58%, rgba(0, 0, 0, 0.28) 0%, transparent 11%),
-    radial-gradient(circle at 44% 80%, rgba(0, 0, 0, 0.22) 0%, transparent 10%),
-    radial-gradient(circle at 76% 30%, rgba(0, 0, 0, 0.2) 0%, transparent 8%),
-    radial-gradient(circle at 40% 40%, #a89bd9 0%, #6f5fa8 50%, #3a3163 100%);
-  animation: moon-bob-spin 55s ease-in-out infinite;
-  will-change: transform;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 42%, transparent 46%, rgba(7, 4, 13, 0.3) 80%, rgba(7, 4, 13, 0.6) 100%);
 }
 
-.planet-small {
+@media (max-width: 700px) {
+  .moon {
+    width: 130px;
+    height: 130px;
+    right: 8vw;
+  }
+  .moon__corona {
+    width: 300px;
+    height: 300px;
+    margin: -150px 0 0 -150px;
+  }
+  .branch {
+    width: 180px;
+    height: 210px;
+  }
+}
+
+/* ============================================================
+   Motion system
+   ============================================================ */
+
+/* Scroll reveal. Only hidden when scripting is available, so a failed
+   script can never leave the page blank. */
+.js .reveal {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition: opacity 0.7s ease, transform 0.75s var(--ease-out);
+}
+
+.js .reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Click ring: drawn in a fixed overlay so it never disturbs the layout of
+   whatever was clicked. */
+.fx {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.fx__ring {
   position: absolute;
-  top: 58%;
-  left: 12%;
-  width: 78px;
-  height: 78px;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
   border-radius: 50%;
-  opacity: 0.7;
-  box-shadow: 0 0 45px rgba(94, 234, 212, 0.35);
-  background-image: radial-gradient(circle at 35% 30%, #bff6ea 0%, #5eead4 30%, #2c8f82 62%, #123c37 100%);
-  animation: small-bob-spin 45s ease-in-out infinite, twinkle-bright 4s ease-in-out infinite alternate;
+  border: 1.5px solid var(--violet-soft);
+  box-shadow: 0 0 14px rgba(200, 166, 255, 0.55);
+  animation: ring-out 0.6s var(--ease-out) forwards;
+}
+
+@keyframes ring-out {
+  from { transform: scale(0.35); opacity: 0.9; }
+  to { transform: scale(6); opacity: 0; }
+}
+
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  z-index: 9998;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--violet), var(--magenta));
+  box-shadow: 0 0 12px rgba(224, 92, 255, 0.6);
   will-change: transform;
 }
 
-/* The ring and giant carry translate(-50%,-50%) inside the keyframes,
-   since a transform animation would otherwise override the centring. */
-@keyframes ring-spin {
-  from { transform: translate(-50%, -50%) rotate(-16deg); }
-  to { transform: translate(-50%, -50%) rotate(344deg); }
+/* Pressed feedback shared by every control on the page. */
+button:active,
+.twitch-link:active,
+.social-link:active,
+.popout-restore-btn:active {
+  transform: translateY(1px) scale(0.98);
 }
 
-@keyframes giant-bob-spin {
-  0% { transform: translate(-50%, -50%) translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate(-50%, -50%) translate3d(0, -16px, 0) rotate(180deg); }
-  100% { transform: translate(-50%, -50%) translate3d(0, 0, 0) rotate(360deg); }
-}
-
-@keyframes moon-bob-spin {
-  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(0, 12px, 0) rotate(-180deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(-360deg); }
-}
-
-@keyframes small-bob-spin {
-  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(0, -10px, 0) rotate(180deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(360deg); }
-}
-
-/* Respect users who ask for less motion: keep the scene, drop the movement.
-   The ring and giant keep their centring transform, minus the animation. */
-@media (prefers-reduced-motion: reduce) {
-  .stars,
-  .nebula,
-  .planet-moon,
-  .planet-small,
-  .planet-giant__ring,
-  .planet-giant__body {
-    animation: none !important;
-  }
-  .planet-giant__ring {
-    transform: translate(-50%, -50%) rotate(-16deg);
-  }
-  .planet-giant__body {
-    transform: translate(-50%, -50%);
-  }
-  .shooting-star {
-    display: none;
-  }
-}
-
-/* ---------- Layout ---------- */
+/* ============================================================
+   Layout
+   ============================================================ */
 main, .site-header, .site-footer {
   position: relative;
   z-index: 1;
 }
 
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 600;
+  border-bottom: 1px solid transparent;
+  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* Height stays constant whether stuck or not -- only the surface changes --
+   so the sticky treatment can never shift the page. */
+.site-header__inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding: 1.5rem 2rem;
   max-width: 1100px;
   margin: 0 auto;
+}
+
+.site-header.is-stuck {
+  background: rgba(10, 6, 22, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: var(--edge);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
 .brand {
@@ -330,7 +642,14 @@ main, .site-header, .site-footer {
 }
 
 .brand-mark {
-  color: var(--accent-soft);
+  color: var(--violet-soft);
+  text-shadow: 0 0 14px var(--glow);
+  animation: brand-glow 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes brand-glow {
+  from { opacity: 0.7; text-shadow: 0 0 8px var(--glow); }
+  to { opacity: 1; text-shadow: 0 0 20px rgba(200, 166, 255, 0.75); }
 }
 
 .header-links {
@@ -341,19 +660,35 @@ main, .site-header, .site-footer {
   justify-content: flex-end;
 }
 
-.twitch-link {
-  color: var(--text-dim);
+/* Shared pill treatment: a violet wash grows in from the left on hover
+   rather than the border simply changing colour. Driven by background-size
+   on the element itself -- an absolutely positioned overlay would need a
+   negative z-index and would then paint behind the pill's own background. */
+.twitch-link,
+.social-link {
+  position: relative;
+  color: var(--moon-dim);
   text-decoration: none;
   font-size: 0.9rem;
-  border: 1px solid var(--card-border);
+  border: 1px solid var(--edge);
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
-  transition: border-color 0.2s, color 0.2s;
+  background-color: rgba(26, 15, 46, 0.35);
+  background-image: linear-gradient(90deg, rgba(160, 107, 255, 0.4), rgba(224, 92, 255, 0.2));
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 0% 100%;
+  transition: color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease,
+    background-size 0.4s var(--ease-out), transform 0.25s var(--ease-out);
 }
 
-.twitch-link:hover {
-  border-color: var(--accent-soft);
-  color: var(--text);
+.twitch-link:hover,
+.social-link:hover {
+  color: var(--moon);
+  border-color: var(--edge-hi);
+  box-shadow: 0 0 20px rgba(160, 107, 255, 0.25);
+  background-size: 100% 100%;
+  transform: translateY(-2px);
 }
 
 main {
@@ -366,9 +701,16 @@ main {
 .live-banner {
   margin: 1rem 0;
   border-radius: 14px;
-  background: linear-gradient(90deg, rgba(255, 84, 112, 0.15), rgba(139, 123, 255, 0.1));
-  border: 1px solid rgba(255, 84, 112, 0.4);
+  background: linear-gradient(90deg, rgba(255, 59, 92, 0.16), rgba(160, 107, 255, 0.1));
+  border: 1px solid rgba(255, 59, 92, 0.4);
+  box-shadow: 0 0 30px rgba(255, 59, 92, 0.12);
   transition: opacity 0.3s ease;
+  animation: banner-in 0.5s var(--ease-out) backwards;
+}
+
+@keyframes banner-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: none; }
 }
 
 .live-banner__inner {
@@ -383,15 +725,15 @@ main {
   height: 10px;
   border-radius: 50%;
   background: var(--live-red);
-  box-shadow: 0 0 0 0 rgba(255, 84, 112, 0.6);
+  box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.6);
   animation: pulse 1.6s infinite;
   flex-shrink: 0;
 }
 
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(255, 84, 112, 0.6); }
-  70% { box-shadow: 0 0 0 10px rgba(255, 84, 112, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 84, 112, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 59, 92, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0); }
 }
 
 .live-banner__text {
@@ -408,7 +750,7 @@ main {
 }
 
 .live-banner__text span {
-  color: var(--text-dim);
+  color: var(--moon-dim);
   font-size: 0.9rem;
   white-space: nowrap;
   overflow: hidden;
@@ -418,7 +760,7 @@ main {
 .live-viewers {
   margin-left: auto;
   font-size: 0.85rem;
-  color: var(--text-dim);
+  color: var(--moon-dim);
   flex-shrink: 0;
 }
 
@@ -442,12 +784,12 @@ main {
   min-height: 300px;
 }
 
-/* Offline stand-in for the player, carrying the same frame treatment as
-   .player-frame so the pair reads as one set of panels either way. */
 .stage-column {
   position: relative;
 }
 
+/* Offline stand-in for the player, carrying the same frame treatment as
+   .player-frame so the pair reads as one set of panels either way. */
 .offline-panel {
   position: relative;
   width: 100%;
@@ -455,9 +797,9 @@ main {
   padding-top: 56.25%;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 0 50px rgba(139, 123, 255, 0.12);
-  background: radial-gradient(ellipse at center, #141830 0%, #05060f 100%);
+  border: 1px solid var(--edge);
+  box-shadow: 0 0 60px rgba(160, 107, 255, 0.14), inset 0 0 60px rgba(26, 15, 46, 0.6);
+  background: radial-gradient(ellipse at center, #1c1134 0%, #0a0517 100%);
 }
 
 .offline-panel__inner {
@@ -470,19 +812,27 @@ main {
   gap: 0.7rem;
   padding: 1.5rem;
   text-align: center;
-  color: var(--text-dim);
+  color: var(--moon-dim);
 }
 
 .offline-panel__mark {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(139, 123, 255, 0.25);
+  background: rgba(160, 107, 255, 0.22);
+  border: 1px solid var(--edge);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.2rem;
-  color: var(--text);
+  color: var(--moon);
+  box-shadow: 0 0 30px rgba(160, 107, 255, 0.3);
+  animation: mark-breathe 3.4s ease-in-out infinite alternate;
+}
+
+@keyframes mark-breathe {
+  from { transform: scale(1); box-shadow: 0 0 20px rgba(160, 107, 255, 0.22); }
+  to { transform: scale(1.06); box-shadow: 0 0 38px rgba(160, 107, 255, 0.42); }
 }
 
 .offline-panel__text {
@@ -496,11 +846,11 @@ main {
   margin: 0.6rem 0 0;
   text-align: right;
   font-size: 0.78rem;
-  color: var(--text-dim);
+  color: var(--moon-dim);
 }
 
 .chat-help a {
-  color: var(--accent-soft);
+  color: var(--violet-soft);
   text-decoration: none;
 }
 
@@ -522,8 +872,8 @@ main {
   height: 100%;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 0 50px rgba(139, 123, 255, 0.12);
+  border: 1px solid var(--edge);
+  box-shadow: 0 0 60px rgba(160, 107, 255, 0.16);
 }
 
 .player-frame iframe {
@@ -548,14 +898,14 @@ main {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(5, 6, 15, 0.65);
-  color: var(--text);
+  border: 1px solid var(--edge);
+  background: rgba(10, 6, 22, 0.7);
+  color: var(--moon);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s var(--ease-out);
 }
 
 .popout-btn--wide {
@@ -567,8 +917,15 @@ main {
 
 .popout-btn--wide.is-active,
 .popout-btn.is-active {
-  background: rgba(139, 123, 255, 0.5);
-  border-color: var(--accent-soft);
+  background: rgba(160, 107, 255, 0.5);
+  border-color: var(--edge-hi);
+}
+
+.popout-btn:hover {
+  background: rgba(160, 107, 255, 0.35);
+  border-color: var(--edge-hi);
+  box-shadow: 0 0 16px rgba(160, 107, 255, 0.4);
+  transform: translateY(-1px);
 }
 
 /* Sit above the iframe (which has no z-index) but below .player-controls
@@ -604,9 +961,9 @@ main {
   margin: 0;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 84, 112, 0.5);
-  background: rgba(5, 6, 15, 0.9);
-  color: var(--text);
+  border: 1px solid rgba(255, 59, 92, 0.5);
+  background: rgba(10, 6, 22, 0.92);
+  color: var(--moon);
   font-size: 0.75rem;
   line-height: 1.4;
   text-align: center;
@@ -615,16 +972,7 @@ main {
 
 /* Drop the framing so the video fills the screen edge to edge. The controls
    sit inside .player-frame, so they stay reachable while fullscreen. */
-.player-frame:fullscreen {
-  width: 100%;
-  height: 100%;
-  padding-top: 0;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  background: #000;
-}
-
+.player-frame:fullscreen,
 .player-frame:-webkit-full-screen {
   width: 100%;
   height: 100%;
@@ -633,11 +981,6 @@ main {
   border-radius: 0;
   box-shadow: none;
   background: #000;
-}
-
-.popout-btn:hover {
-  background: rgba(139, 123, 255, 0.35);
-  border-color: var(--accent-soft);
 }
 
 .player-frame.is-popped-out {
@@ -651,11 +994,15 @@ main {
   height: auto;
   padding-top: min(202px, 50.6vw);
   z-index: 500;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 40px rgba(160, 107, 255, 0.18);
+  animation: dock-in 0.4s var(--ease-out);
 }
 
-/* Floating ITZon mirror. Docks bottom-left so it never collides with a
-   popped-out Twitch player (bottom-right). */
+@keyframes dock-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
 /* Bottom-left stack. Positioning lives here rather than on each item, so a
    visible now-playing card pushes the side stream up instead of overlapping
    it, and hiding either one collapses its space automatically. */
@@ -680,9 +1027,57 @@ main {
   width: min(340px, 90vw);
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--card-border);
-  background: #05060f;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--edge);
+  background: var(--deep);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 30px rgba(160, 107, 255, 0.14);
+  animation: dock-in 0.4s var(--ease-out);
+}
+
+.sidestream__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+  background: rgba(160, 107, 255, 0.1);
+}
+
+.sidestream__label {
+  font-size: 0.75rem;
+  color: var(--moon-dim);
+  letter-spacing: 0.03em;
+}
+
+.sidestream__close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--moon-dim);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidestream__close:hover {
+  background: rgba(200, 166, 255, 0.15);
+  color: var(--moon);
+}
+
+.sidestream__frame {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: #000;
+}
+
+.sidestream__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 
 /* ---------- Now playing ---------- */
@@ -693,12 +1088,11 @@ main {
   max-width: min(340px, 90vw);
   padding: 0.55rem 0.9rem 0.55rem 0.7rem;
   border-radius: 999px;
-  /* One step up from the page background so the card reads as a distinct
-     surface, while staying firmly in the dark palette. */
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(18, 21, 44, 0.94);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
+  border: 1px solid var(--edge);
+  background: var(--surface-hi);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 26px rgba(160, 107, 255, 0.14);
+  backdrop-filter: blur(8px);
+  animation: dock-in 0.4s var(--ease-out);
 }
 
 .nowplaying__art {
@@ -707,6 +1101,16 @@ main {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(160, 107, 255, 0.35);
+  animation: spin-art 14s linear infinite;
+}
+
+@keyframes spin-art {
+  to { transform: rotate(360deg); }
+}
+
+.nowplaying.is-idle .nowplaying__art {
+  animation-play-state: paused;
 }
 
 .nowplaying__meta {
@@ -719,13 +1123,13 @@ main {
   font-size: 0.6rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--accent-soft);
+  color: var(--violet-soft);
 }
 
 .nowplaying__title {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--moon);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -733,7 +1137,7 @@ main {
 
 .nowplaying__artist {
   font-size: 0.75rem;
-  color: var(--text-dim);
+  color: var(--moon-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -751,7 +1155,7 @@ main {
 .nowplaying__bars i {
   width: 3px;
   border-radius: 2px;
-  background: var(--accent-soft);
+  background: linear-gradient(180deg, var(--magenta), var(--violet));
   transform-origin: bottom;
   animation: eq 900ms ease-in-out infinite alternate;
 }
@@ -763,11 +1167,11 @@ main {
 }
 
 .nowplaying.is-idle .nowplaying__label {
-  color: var(--text-dim);
+  color: var(--moon-dim);
 }
 
 .nowplaying.is-idle .nowplaying__bars i {
-  background: var(--text-dim);
+  background: var(--moon-dim);
   animation: none;
   transform: scaleY(0.55);
 }
@@ -779,12 +1183,6 @@ main {
 @keyframes eq {
   from { transform: scaleY(0.4); }
   to { transform: scaleY(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nowplaying__bars i {
-    animation: none;
-  }
 }
 
 /* ---------- League of Legends status ---------- */
@@ -804,23 +1202,24 @@ main {
   z-index: 2;
   width: 34px;
   height: 64px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--edge);
   border-right: none;
   border-radius: 10px 0 0 10px;
-  background: rgba(18, 21, 44, 0.94);
-  color: var(--text-dim);
+  background: var(--surface-hi);
+  color: var(--moon-dim);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(6px);
-  transition: color 0.15s, background 0.15s;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  transition: color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
 .league-tab:hover {
-  color: var(--text);
-  background: rgba(28, 32, 62, 0.96);
+  color: var(--moon);
+  background: rgba(52, 32, 90, 0.95);
+  box-shadow: -8px 0 28px rgba(160, 107, 255, 0.3);
 }
 
 .league-tab__icon {
@@ -842,18 +1241,17 @@ main {
   min-width: 210px;
   max-width: 300px;
   padding: 0.8rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--edge);
   border-right: none;
   border-radius: 12px 0 0 12px;
-  background: rgba(18, 21, 44, 0.94);
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(6px);
+  background: var(--surface-hi);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45), 0 0 30px rgba(160, 107, 255, 0.12);
+  backdrop-filter: blur(8px);
   margin-right: -1px;
   transform: translateY(-50%);
   /* Decelerating curve -- moves off quickly then settles, rather than the
      linear-feeling ease. Opacity trails slightly so it fades in as it lands. */
-  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.26s ease 0.04s;
+  transition: transform 0.38s var(--ease-out), opacity 0.26s ease 0.04s;
 }
 
 /* Tucked fully behind the tab, plus a little extra so the shadow clears too. */
@@ -861,27 +1259,26 @@ main {
   transform: translateY(-50%) translateX(calc(100% + 12px));
   opacity: 0;
   pointer-events: none;
-  transition: transform 0.3s cubic-bezier(0.5, 0, 0.75, 0),
-    opacity 0.18s ease;
+  transition: transform 0.3s var(--ease-in), opacity 0.18s ease;
 }
 
 .league-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--text-dim);
+  background: var(--moon-dim);
   flex-shrink: 0;
 }
 
 .league-card.is-in-game .league-dot {
-  background: #3ddc84;
+  background: var(--win);
   animation: pulse-green 1.6s infinite;
 }
 
 @keyframes pulse-green {
-  0% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.6); }
-  70% { box-shadow: 0 0 0 10px rgba(61, 220, 132, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
 }
 
 .league-head {
@@ -893,7 +1290,7 @@ main {
 .league-status {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--moon);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -904,7 +1301,7 @@ main {
 .league-timer {
   margin-left: auto;
   font-size: 0.75rem;
-  color: var(--text-dim);
+  color: var(--moon-dim);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
@@ -928,6 +1325,7 @@ main {
   border-radius: 10px;
   flex-shrink: 0;
   object-fit: cover;
+  border: 1px solid var(--edge);
 }
 
 .league-spells {
@@ -953,7 +1351,7 @@ main {
 .league-detail,
 .league-side {
   font-size: 0.75rem;
-  color: var(--text-dim);
+  color: var(--moon-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -967,14 +1365,14 @@ main {
   flex-direction: column;
   gap: 0.3rem;
   padding-top: 0.55rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--edge);
 }
 
 .league-label {
   font-size: 0.6rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--moon-dim);
 }
 
 .league-iconrow {
@@ -991,11 +1389,16 @@ main {
   display: block;
 }
 
-/* The player's own champion in a matchup pairing, to anchor the "vs". */
-.league-iconrow .league-vs {
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  margin: 0 0.1rem;
+/* The player's own pick, so they can find themselves in their team's row. */
+.league-iconrow .league-me {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 1px;
+  box-shadow: 0 0 12px rgba(200, 166, 255, 0.55);
+}
+
+/* Separates the two team rows without adding another divider line. */
+.league-label--spaced {
+  margin-top: 0.35rem;
 }
 
 /* Bans are context, not the headline -- dimmed until hovered. */
@@ -1009,9 +1412,9 @@ main {
 }
 
 /* Win/loss colouring for the post-game state. */
-.league-card.is-win .league-dot { background: #3ddc84; }
+.league-card.is-win .league-dot { background: var(--win); }
 .league-card.is-loss .league-dot { background: var(--live-red); }
-.league-card.is-win .league-status { color: #6ee7a8; }
+.league-card.is-win .league-status { color: #86efac; }
 .league-card.is-loss .league-status { color: #ff8f8f; }
 
 @media (max-width: 640px) {
@@ -1022,65 +1425,6 @@ main {
     width: 28px;
     height: 56px;
   }
-}
-
-/* Snap between states rather than sliding, but keep the tab and the
-   card's vertical centring intact. */
-@media (prefers-reduced-motion: reduce) {
-  .league-card,
-  .league-card.is-collapsed {
-    transition: none;
-  }
-  .league-card.is-in-game .league-dot {
-    animation: none;
-  }
-}
-
-.sidestream__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.4rem 0.4rem 0.4rem 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.sidestream__label {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  letter-spacing: 0.03em;
-}
-
-.sidestream__close {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.sidestream__close:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-}
-
-.sidestream__frame {
-  position: relative;
-  width: 100%;
-  padding-top: 56.25%;
-  background: #000;
-}
-
-.sidestream__frame iframe {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: none;
 }
 
 @media (max-width: 640px) {
@@ -1106,35 +1450,37 @@ main {
   justify-content: center;
   gap: 0.75rem;
   border-radius: 16px;
-  border: 1px dashed var(--card-border);
-  background: var(--card-bg);
-  color: var(--text-dim);
+  border: 1px dashed var(--edge);
+  background: var(--surface);
+  color: var(--moon-dim);
   font-size: 0.9rem;
   text-align: center;
 }
 
 .popout-restore-btn {
-  border: 1px solid var(--card-border);
+  border: 1px solid var(--edge);
   background: transparent;
-  color: var(--text);
+  color: var(--moon);
   padding: 0.4rem 1rem;
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.85rem;
-  transition: border-color 0.15s, color 0.15s;
+  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .popout-restore-btn:hover {
-  border-color: var(--accent-soft);
-  color: var(--accent-soft);
+  border-color: var(--edge-hi);
+  color: var(--violet-soft);
+  box-shadow: 0 0 18px rgba(160, 107, 255, 0.3);
 }
 
 .chat-frame {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--card-border);
+  border: 1px solid var(--edge);
   min-height: 300px;
+  box-shadow: 0 0 40px rgba(160, 107, 255, 0.1);
 }
 
 .chat-frame iframe {
@@ -1165,28 +1511,73 @@ main {
   font-family: "Space Grotesk", sans-serif;
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   margin: 0 0 0.75rem;
-  background: linear-gradient(90deg, var(--text) 20%, var(--accent-soft) 60%, var(--accent) 100%);
+  /* Oversized gradient that slides, so the title shimmers like moonlight
+     moving across it rather than sitting flat. */
+  background: linear-gradient(
+    100deg,
+    var(--moon) 0%,
+    var(--violet-soft) 25%,
+    var(--magenta) 45%,
+    var(--violet-soft) 65%,
+    var(--moon) 100%
+  );
+  background-size: 250% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  animation: title-shimmer 9s ease-in-out infinite;
+}
+
+@keyframes title-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 .hero p {
-  color: var(--text-dim);
+  color: var(--moon-dim);
   max-width: 560px;
   margin: 0 auto;
   line-height: 1.6;
 }
 
-/* ---------- VODs ---------- */
-.vods-section h2 {
+/* ---------- Section headings ---------- */
+/* A short violet rule under each heading, drawn in from the left when the
+   section reveals. */
+.vods-section h2,
+.about__body h2,
+.socials-section h2 {
+  position: relative;
   font-family: "Space Grotesk", sans-serif;
   font-size: 1.3rem;
-  margin-bottom: 1rem;
+  margin: 0 0 1rem;
+  padding-bottom: 0.55rem;
 }
 
+.vods-section h2::after,
+.about__body h2::after,
+.socials-section h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 54px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--violet), var(--magenta));
+  box-shadow: 0 0 12px rgba(160, 107, 255, 0.6);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 0.6s var(--ease-out) 0.15s;
+}
+
+.reveal.is-visible h2::after,
+html:not(.js) h2::after {
+  transform: scaleX(1);
+}
+
+/* ---------- VODs ---------- */
 .vods-status {
-  color: var(--text-dim);
+  color: var(--moon-dim);
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
@@ -1219,11 +1610,31 @@ main {
   flex: 0 0 calc((100% - 3rem) / 3);
   min-width: 0;
   scroll-snap-align: start;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  background: var(--surface);
+  border: 1px solid var(--edge);
   border-radius: 14px;
   overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.3s var(--ease-out), border-color 0.3s ease, box-shadow 0.3s ease;
+  /* `backwards` (not `both`): a forwards fill would pin transform:none
+     after the animation and outrank the hover lift below. */
+  animation: card-in 0.55s var(--ease-out) backwards;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.vod-card:nth-child(1) { animation-delay: 0.04s; }
+.vod-card:nth-child(2) { animation-delay: 0.12s; }
+.vod-card:nth-child(3) { animation-delay: 0.2s; }
+.vod-card:nth-child(4) { animation-delay: 0.28s; }
+.vod-card:nth-child(n + 5) { animation-delay: 0.34s; }
+
+.vod-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--edge-hi);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(160, 107, 255, 0.22);
 }
 
 .vods-nav {
@@ -1234,19 +1645,20 @@ main {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--card-border);
-  background: rgba(5, 6, 15, 0.75);
-  color: var(--text);
+  border: 1px solid var(--edge);
+  background: rgba(10, 6, 22, 0.8);
+  color: var(--moon);
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s, box-shadow 0.2s;
 }
 
-.vods-nav:hover {
-  background: rgba(139, 123, 255, 0.35);
-  border-color: var(--accent-soft);
+.vods-nav:hover:not(:disabled) {
+  background: rgba(160, 107, 255, 0.4);
+  border-color: var(--edge-hi);
+  box-shadow: 0 0 22px rgba(160, 107, 255, 0.45);
 }
 
 .vods-nav:disabled {
@@ -1254,32 +1666,16 @@ main {
   cursor: default;
 }
 
-.vods-nav--prev {
-  left: -14px;
-}
-
-.vods-nav--next {
-  right: -14px;
-}
+.vods-nav--prev { left: -14px; }
+.vods-nav--next { right: -14px; }
 
 @media (max-width: 800px) {
-  .vod-card {
-    flex-basis: 78%;
-  }
+  .vod-card { flex-basis: 78%; }
 }
 
 @media (max-width: 480px) {
-  .vod-card {
-    flex-basis: 88%;
-  }
-  .vods-nav {
-    display: none;
-  }
-}
-
-.vod-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(139, 123, 255, 0.4);
+  .vod-card { flex-basis: 88%; }
+  .vods-nav { display: none; }
 }
 
 /* Placeholder cards rendered in the HTML so the carousel occupies its
@@ -1290,11 +1686,12 @@ main {
 
 .vod-card--skeleton:hover {
   transform: none;
-  border-color: var(--card-border);
+  border-color: var(--edge);
+  box-shadow: none;
 }
 
 .vod-card--skeleton .vod-card__player {
-  background: linear-gradient(100deg, #0c0f1e 30%, #141830 50%, #0c0f1e 70%);
+  background: linear-gradient(100deg, #140b26 30%, #241542 50%, #140b26 70%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
@@ -1302,12 +1699,6 @@ main {
 @keyframes skeleton-shimmer {
   from { background-position: 150% 0; }
   to { background-position: -50% 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vod-card--skeleton .vod-card__player {
-    animation: none;
-  }
 }
 
 .vod-card__player {
@@ -1332,6 +1723,12 @@ main {
   height: 100%;
   object-fit: cover;
   cursor: pointer;
+  transition: transform 0.5s var(--ease-out), filter 0.35s ease;
+}
+
+.vod-card:hover .vod-card__player img {
+  transform: scale(1.05);
+  filter: brightness(1.1) saturate(1.1);
 }
 
 .vod-card__play {
@@ -1342,18 +1739,19 @@ main {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: none;
-  background: rgba(5, 6, 15, 0.6);
-  color: var(--text);
+  border: 1px solid var(--edge);
+  background: rgba(10, 6, 22, 0.65);
+  color: var(--moon);
   font-size: 1.1rem;
   cursor: pointer;
   backdrop-filter: blur(3px);
-  transition: background 0.15s, transform 0.15s;
+  transition: background 0.25s, transform 0.25s var(--ease-out), box-shadow 0.25s;
 }
 
 .vod-card__player:hover .vod-card__play {
-  background: rgba(139, 123, 255, 0.55);
-  transform: translate(-50%, -50%) scale(1.08);
+  background: rgba(160, 107, 255, 0.6);
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 0 28px rgba(160, 107, 255, 0.6);
 }
 
 .vod-card__body {
@@ -1376,7 +1774,7 @@ main {
 }
 
 .vod-card__meta {
-  color: var(--text-dim);
+  color: var(--moon-dim);
   font-size: 0.8rem;
   display: flex;
   gap: 0.6rem;
@@ -1385,7 +1783,7 @@ main {
 /* ---------- About ---------- */
 .about-section {
   margin-top: 4rem;
-  scroll-margin-top: 2rem;
+  scroll-margin-top: 5rem;
   display: grid;
   grid-template-columns: 160px 1fr;
   gap: 2rem;
@@ -1398,10 +1796,16 @@ main {
   height: 160px;
   border-radius: 50%;
   overflow: hidden;
-  border: 1px solid var(--card-border);
+  border: 1px solid var(--edge-hi);
   /* Shows through when no avatar file is present. */
-  background: radial-gradient(circle at 35% 30%, #2a2550 0%, #14162e 60%, #0b0e20 100%);
-  box-shadow: 0 0 40px rgba(139, 123, 255, 0.15);
+  background: radial-gradient(circle at 35% 30%, #3a2160 0%, #1c1134 60%, #0d0718 100%);
+  box-shadow: 0 0 50px rgba(160, 107, 255, 0.28);
+  transition: transform 0.4s var(--ease-out), box-shadow 0.4s ease;
+}
+
+.about__avatar:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 70px rgba(200, 166, 255, 0.45);
 }
 
 .about__avatar img {
@@ -1425,18 +1829,12 @@ main {
   align-items: center;
   justify-content: center;
   font-size: 2rem;
-  color: var(--accent-soft);
+  color: var(--violet-soft);
   opacity: 0.5;
 }
 
-.about__body h2 {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1.3rem;
-  margin: 0 0 0.75rem;
-}
-
 .about__body p {
-  color: var(--text-dim);
+  color: var(--moon-dim);
   line-height: 1.6;
   margin: 0 0 0.75rem;
 }
@@ -1452,18 +1850,20 @@ main {
     text-align: center;
     gap: 1.5rem;
   }
+  .about__body h2::after {
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    transform-origin: 50% 50%;
+  }
+  .reveal.is-visible .about__body h2::after {
+    transform: translateX(-50%) scaleX(1);
+  }
 }
 
 /* ---------- Socials ---------- */
 .socials-section {
   margin-top: 4rem;
-  scroll-margin-top: 2rem;
-}
-
-.socials-section h2 {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1.3rem;
-  margin-bottom: 1rem;
+  scroll-margin-top: 5rem;
 }
 
 .socials-row {
@@ -1476,56 +1876,143 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--text);
+  color: var(--moon);
   font-size: 0.9rem;
-  text-decoration: none;
-  border: 1px solid var(--card-border);
   padding: 0.55rem 1.1rem;
-  border-radius: 999px;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.social-link:hover {
-  border-color: var(--accent-soft);
-  color: var(--accent-soft);
 }
 
 .social-link__mark {
-  color: var(--accent-soft);
+  color: var(--violet-soft);
+}
+
+/* Stagger the row so the links arrive one after another. */
+.js .reveal .social-link {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease, transform 0.5s var(--ease-out),
+    color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease,
+    background-size 0.4s var(--ease-out);
+}
+
+.js .reveal.is-visible .social-link {
+  opacity: 1;
+  transform: none;
+}
+
+.socials-row .social-link:nth-child(1) { transition-delay: 0.08s; }
+.socials-row .social-link:nth-child(2) { transition-delay: 0.16s; }
+.socials-row .social-link:nth-child(3) { transition-delay: 0.24s; }
+.socials-row .social-link:nth-child(4) { transition-delay: 0.32s; }
+.socials-row .social-link:nth-child(5) { transition-delay: 0.4s; }
+
+/* Hover has its own delay-free transition so a staggered link still
+   responds instantly once it has landed. */
+.socials-row .social-link:hover {
+  transition-delay: 0s;
 }
 
 /* ---------- Footer ---------- */
 .site-footer {
   text-align: center;
   padding: 2rem;
-  color: var(--text-dim);
+  color: var(--moon-dim);
   font-size: 0.75rem;
   opacity: 0.7;
 }
 
 @media (max-width: 640px) {
-  .site-header {
-    padding: 1.25rem 1.25rem;
+  /* Four pills plus the brand can't share a row at phone widths -- side by
+     side they wrapped one-per-line and pushed the header past 190px tall.
+     Stacking the brand above a single tightened row keeps it near 100px. */
+  .site-header__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 1rem 1.25rem;
+  }
+  .header-links {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.4rem;
+  }
+  .twitch-link {
+    font-size: 0.8rem;
+    padding: 0.32rem 0.7rem;
   }
   main {
     padding: 0 1.25rem 3rem;
   }
-  /* Scale the planets down so they stay decorative rather than dominating
-     a phone screen. The giant scales as a unit via transform-origin. */
-  .planet-giant {
-    width: 200px;
-    height: 200px;
-    right: -70px;
-    transform: scale(0.62);
-    transform-origin: top right;
+}
+
+/* ============================================================
+   Reduced motion
+   Keep the scene and the states, drop the movement.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
-  .planet-moon {
-    width: 92px;
-    height: 92px;
-    left: -34px;
+
+  .stars,
+  .sky__wash,
+  .sky__swirl,
+  .moon,
+  .moon__corona,
+  .clouds,
+  .branch,
+  .branch__blossoms,
+  .brand-mark,
+  .offline-panel__mark,
+  .hero h1,
+  .nowplaying__art,
+  .nowplaying__bars i,
+  .vod-card,
+  .live-banner,
+  .sidestream,
+  .nowplaying,
+  .player-frame.is-popped-out,
+  .vod-card--skeleton .vod-card__player,
+  .league-card.is-in-game .league-dot {
+    animation: none !important;
   }
-  .planet-small {
-    width: 52px;
-    height: 52px;
+
+  /* The ceiling bank carries its flip inside the keyframes, so it needs
+     restating once the animation is off. */
+  .clouds--ceiling {
+    transform: scaleY(-1);
+  }
+
+  .petals,
+  .flash {
+    display: none;
+  }
+
+  .js .reveal,
+  .js .reveal .social-link {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .vods-section h2::after,
+  .about__body h2::after,
+  .socials-section h2::after {
+    transform: scaleX(1);
+    transition: none;
+  }
+
+  .league-card,
+  .league-card.is-collapsed {
+    transition: none;
+  }
+
+  .fx__ring {
+    display: none;
+  }
+
+  .vod-card:hover,
+  .vod-card:hover .vod-card__player img,
+  .about__avatar:hover {
+    transform: none;
   }
 }
