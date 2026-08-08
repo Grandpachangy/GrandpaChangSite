@@ -35,11 +35,32 @@ const QUEUE_NAMES = {
   430: "Normal Blind",
   440: "Ranked Flex",
   450: "ARAM",
+  480: "Swiftplay",
   490: "Quickplay",
   700: "Clash",
+  720: "ARAM Clash",
+  900: "ARURF",
+  1010: "Snow ARURF",
+  1020: "One for All",
+  1300: "Nexus Blitz",
+  1400: "Ultimate Spellbook",
   1700: "Arena",
+  1710: "Arena",
   1900: "URF",
+  2300: "Brawl",
 };
+
+// Riot's gameMode for an unmapped queue is an internal codename in caps
+// (a live game came back as "KIWI"). Title-casing at least stops it being
+// shouted at viewers; the queueId travels in the payload so an unknown mode
+// can be identified and added above rather than guessed at.
+function queueLabel(game) {
+  const known = QUEUE_NAMES[game.gameQueueConfigId];
+  if (known) return known;
+  const mode = typeof game.gameMode === "string" ? game.gameMode : "";
+  if (!mode || mode === "CLASSIC") return "Custom";
+  return mode.charAt(0) + mode.slice(1).toLowerCase();
+}
 
 const puuidCache = new Map();
 
@@ -237,6 +258,8 @@ module.exports = async (req, res) => {
 
   try {
     let checkedOk = 0;
+    let failures = 0;
+    let activeAccountFailed = false;
     let authFailures = 0;
 
     for (const account of accountsByPriority()) {
@@ -246,6 +269,12 @@ module.exports = async (req, res) => {
         checkedOk++;
       } catch (err) {
         if (err.status === 401 || err.status === 403) authFailures++;
+        failures++;
+        // A failure on the account that was last seen playing is the one that
+        // matters: the others returning "not in a game" says nothing about it.
+        if (`${account.gameName}#${account.tagLine}` === lastActiveKey) {
+          activeAccountFailed = true;
+        }
         console.error("league: account check failed:", err.message);
         continue;
       }
@@ -281,7 +310,8 @@ module.exports = async (req, res) => {
         account: `${account.gameName}#${account.tagLine}`,
         region: account.platform === "eun1" ? "EUNE" : "EUW",
         champion: championPayload(idx, me.championId),
-        queue: QUEUE_NAMES[game.gameQueueConfigId] || game.gameMode || "Custom",
+        queue: queueLabel(game),
+        queueId: game.gameQueueConfigId ?? null,
         gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
         side: myTeam === 100 ? "Blue" : "Red",
         spells: [spellPayload(idx, me.spell1Id), spellPayload(idx, me.spell2Id)].filter(Boolean),
@@ -298,6 +328,23 @@ module.exports = async (req, res) => {
       console.error("league: all accounts failed auth -- RIOT_API_KEY is set but invalid");
       res.setHeader("Cache-Control", "s-maxage=20");
       res.status(200).json({ configured: true, keyValid: false, state: "idle" });
+      return;
+    }
+
+    // A sweep that told us nothing must not be reported as "not in a game".
+    // Returning idle here is indistinguishable from genuinely being idle, so a
+    // single rate-limited or timed-out sweep made the widget drop out of the
+    // in-game state and then snap back -- the flicker. "unknown" lets the
+    // client hold whatever it is already showing.
+    const staleActive =
+      activeAccountFailed && Date.now() - lastActiveSeenAt < POSTGAME_LOOKUP_WINDOW_MS;
+    if ((checkedOk === 0 && failures > 0) || staleActive) {
+      console.error(
+        `league: sweep inconclusive (ok=${checkedOk} failures=${failures} activeFailed=${activeAccountFailed})`
+      );
+      // Short cache: retry soon rather than pinning an inconclusive answer.
+      res.setHeader("Cache-Control", "s-maxage=5");
+      res.status(200).json({ configured: true, keyValid: true, state: "unknown" });
       return;
     }
 

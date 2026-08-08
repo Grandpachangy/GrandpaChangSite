@@ -433,7 +433,30 @@ function renderClock() {
   leagueTimerEl.textContent = formatClock(elapsed);
 }
 
+// Riot's spectator `gameLength` can sit frozen for the first minutes of a
+// match -- a live game reported 120 for well over half a minute. Re-syncing to
+// a stalled value would drag the timer backwards on every poll, so a sync is
+// only accepted when it moves forward. A large backwards jump is a different
+// game starting, and does reset the clock.
+const CLOCK_RESET_THRESHOLD_SEC = 90;
+
 function startGameClock(baseSec) {
+  const displayed =
+    gameClockBaseSec === null
+      ? null
+      : gameClockBaseSec + (Date.now() - gameClockSyncedAt) / 1000;
+
+  const isStalledSync =
+    displayed !== null &&
+    baseSec < displayed &&
+    displayed - baseSec < CLOCK_RESET_THRESHOLD_SEC;
+
+  if (isStalledSync) {
+    // Keep ticking locally rather than rewinding to the stale value.
+    if (!gameClockTicker) gameClockTicker = setInterval(renderClock, 1000);
+    return;
+  }
+
   gameClockBaseSec = baseSec;
   gameClockSyncedAt = Date.now();
   renderClock();
@@ -489,6 +512,9 @@ function stopLeaguePolling() {
 async function checkLeague() {
   try {
     const res = await fetch("/api/league");
+    // A 500 body has no `state`, which used to fall through to the idle
+    // branch and knock the card out of its in-game state.
+    if (!res.ok) throw new Error(`league endpoint returned ${res.status}`);
     const data = await res.json();
 
     // Credentials not set yet: stop polling rather than hammering the endpoint.
@@ -497,6 +523,10 @@ async function checkLeague() {
       stopLeaguePolling();
       return;
     }
+
+    // The sweep couldn't determine anything (rate limit, upstream blip).
+    // Hold whatever is on screen instead of falsely showing "not in game".
+    if (data.state === "unknown") return;
 
     leagueWidget.classList.remove("is-hidden");
 
