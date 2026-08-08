@@ -415,6 +415,7 @@ let leagueStopped = false;
 // locally between polls so the timer moves every second rather than jumping
 // in 10s steps.
 let gameClockBaseSec = null;
+let gameClockGameId = null;
 let gameClockSyncedAt = 0;
 let gameClockTicker = null;
 
@@ -436,11 +437,13 @@ function renderClock() {
 // Riot refreshes `gameLength` in coarse steps of about a minute, so between
 // refreshes it reads progressively behind the real clock -- measured live it
 // swung from accurate to ~66s stale and back. Re-syncing to a stale read would
-// drag the timer backwards, so a sync is only accepted when it moves forward:
-// the display then tracks the accurate value each refresh lands on, and ticks
-// locally in between. A large backwards jump is a different game starting, and
-// does reset the clock.
-const CLOCK_RESET_THRESHOLD_SEC = 90;
+// drag the timer backwards, so a sync is only accepted when it moves forward,
+// and the display ticks locally in between.
+//
+// A new match is identified by gameId, never by how far a value jumped back.
+// Edge nodes cache independently, so a poll can legitimately return a snapshot
+// a minute or more older than the last one -- treating a big backwards jump as
+// a new game reset the timer to that stale value mid-match.
 
 // Riot's gameLength runs a constant ~30s behind the clock on the player's
 // screen, even immediately after it refreshes. Measured against a live game:
@@ -450,18 +453,25 @@ const CLOCK_RESET_THRESHOLD_SEC = 90;
 // reporting Riot's raw value.
 const CLOCK_OFFSET_SEC = 30;
 
-function startGameClock(baseSec) {
+function startGameClock(baseSec, gameId) {
+  // A different match: take the new value as-is, however far it moves.
+  if (gameId != null && gameId !== gameClockGameId) {
+    gameClockGameId = gameId;
+    gameClockBaseSec = baseSec;
+    gameClockSyncedAt = Date.now();
+    renderClock();
+    if (!gameClockTicker) gameClockTicker = setInterval(renderClock, 1000);
+    return;
+  }
+
   const displayed =
     gameClockBaseSec === null
       ? null
       : gameClockBaseSec + (Date.now() - gameClockSyncedAt) / 1000;
 
-  const isStalledSync =
-    displayed !== null &&
-    baseSec < displayed &&
-    displayed - baseSec < CLOCK_RESET_THRESHOLD_SEC;
+  const isStaleSync = displayed !== null && baseSec < displayed;
 
-  if (isStalledSync) {
+  if (isStaleSync) {
     // Keep ticking locally rather than rewinding to the stale value.
     if (!gameClockTicker) gameClockTicker = setInterval(renderClock, 1000);
     return;
@@ -477,6 +487,7 @@ function stopGameClock() {
   clearInterval(gameClockTicker);
   gameClockTicker = null;
   gameClockBaseSec = null;
+  gameClockGameId = null;
   leagueTimerEl.textContent = "";
 }
 
@@ -678,9 +689,9 @@ function renderInGame(data) {
       typeof data.fetchedAt === "number"
         ? Math.max(0, (Date.now() - data.fetchedAt) / 1000)
         : 0;
-    startGameClock(data.gameLengthSec + cacheAgeSec + CLOCK_OFFSET_SEC);
+    startGameClock(data.gameLengthSec + cacheAgeSec + CLOCK_OFFSET_SEC, data.gameId);
   } else if (typeof data.gameStartedAt === "number" && data.gameStartedAt > 0) {
-    startGameClock((Date.now() - data.gameStartedAt) / 1000 - CLOCK_OFFSET_SEC);
+    startGameClock((Date.now() - data.gameStartedAt) / 1000 - CLOCK_OFFSET_SEC, data.gameId);
   } else {
     stopGameClock();
   }

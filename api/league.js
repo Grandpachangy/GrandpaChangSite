@@ -345,6 +345,10 @@ module.exports = async (req, res) => {
         // cache, which would otherwise make the timer read low.
         gameLengthSec: typeof game.gameLength === "number" ? game.gameLength : null,
         fetchedAt: Date.now(),
+        // Lets the client tell "a new match started" apart from "an edge
+        // node handed me an older snapshot", which guessing from the size
+        // of a backwards jump could not do.
+        gameId: game.gameId ?? null,
         gameStartedAt:
           typeof game.gameStartTime === "number" && game.gameStartTime > 0
             ? game.gameStartTime
