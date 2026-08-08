@@ -1845,13 +1845,24 @@ html:not(.js) h2::after {
   line-height: 1;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  transition: background 0.2s, border-color 0.2s, opacity 0.2s, box-shadow 0.2s;
+  transition: background 0.25s var(--ease-out), border-color 0.25s var(--ease-out),
+              opacity 0.25s var(--ease-out);
 }
 
+/* Kept deliberately quiet: the disc lifts a shade and the rim brightens, and
+   that's all. These sit right on top of the artwork while the carousel is
+   moving, so a coloured fill and a glow were competing with the thing they
+   scroll. */
 .vods-nav:hover:not(:disabled) {
-  background: rgba(160, 107, 255, 0.4);
+  background: rgba(31, 19, 55, 0.9);
   border-color: var(--edge-hi);
-  box-shadow: 0 0 22px rgba(160, 107, 255, 0.45);
+}
+
+/* The shared button:active rule sets transform outright, which drops the
+   translateY(-50%) these rely on for centring -- the arrow jumped ~20px down
+   the moment you clicked it. Restate the centring alongside the press. */
+.vods-nav:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.94);
 }
 
 .vods-nav:disabled {
@@ -1859,8 +1870,13 @@ html:not(.js) h2::after {
   cursor: default;
 }
 
-.vods-nav--prev { left: -14px; }
-.vods-nav--next { right: -14px; }
+/* Flush with the column edge rather than hanging 14px outside it: the League
+   tab is fixed to the right edge, and the overhang put 12px of the next arrow
+   underneath it. The tab sits at z-index 500 against the arrow's 5, so that
+   strip toggled the League card instead of scrolling the carousel. Both sides
+   move together to keep the pair symmetric. */
+.vods-nav--prev { left: 0; }
+.vods-nav--next { right: 0; }
 
 @media (max-width: 800px) {
   .vod-card { flex-basis: 78%; }
