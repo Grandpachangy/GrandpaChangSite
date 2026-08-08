@@ -707,7 +707,7 @@ main, .site-header, .site-footer {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.5rem 2rem;
+  padding: 1.5rem 2.25rem;
   max-width: 1100px;
   margin: 0 auto;
 }
@@ -883,7 +883,11 @@ main, .site-header, .site-footer {
 main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 0 2rem 4rem;
+  /* 2.25rem side padding, not 2rem: the League tab is fixed flush right and is
+     34px wide, so a 32px gutter left the last couple of pixels of a
+     full-width line underneath it on any viewport below ~1104px. Keep this,
+     .site-header__inner and .site-footer in step so the columns stay aligned. */
+  padding: 0 2.25rem 4rem;
 }
 
 /* ---------- Live banner ---------- */
@@ -2350,7 +2354,7 @@ html:not(.js) h2::after {
 /* ---------- Footer ---------- */
 .site-footer {
   text-align: center;
-  padding: 2rem;
+  padding: 2rem 2.25rem;
   /* Clear the docked cards in the bottom-left corner. --dock-h is published
      by the script and is 0px whenever nothing is docked. */
   padding-bottom: calc(2rem + var(--dock-h, 0px));
@@ -2377,7 +2381,9 @@ html:not(.js) h2::after {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.6rem;
-    padding: 1rem 1.25rem;
+    /* Side padding tracks main's, below, so the brand lines up with the
+       content column. */
+    padding: 1rem 2rem;
   }
   .header-links {
     width: 100%;
@@ -2393,8 +2399,13 @@ html:not(.js) h2::after {
     right: auto;
     transform-origin: top left;
   }
+  /* 2rem, not 1.25rem: the League tab is fixed flush to the right edge and is
+     28px wide at this size, so a narrower gutter let it sit on top of the last
+     few characters of every full-width line as you scrolled past it. 28px
+     would only just clear it -- the chat-help link runs the full width and
+     ended exactly on the tab's edge -- so this leaves 4px of daylight. */
   main {
-    padding: 0 1.25rem 3rem;
+    padding: 0 2rem 3rem;
   }
 }
 
@@ -2509,6 +2520,15 @@ html:not(.js) h2::after {
   .socials-section h2::after {
     transform: scaleX(1);
     transition: none;
+  }
+
+  /* The About heading centres under 640px, and its underline is centred with
+     a translate. The rule above drops that translate, which parked the bar
+     half a heading to the right until the reveal observer caught up. */
+  @media (max-width: 640px) {
+    .about__body h2::after {
+      transform: translateX(-50%) scaleX(1);
+    }
   }
 
   .league-card,

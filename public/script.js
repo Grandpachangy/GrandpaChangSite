@@ -1212,11 +1212,55 @@ function tierLabel(q) {
   return apex || !q.division ? tier : `${tier} ${q.division}`;
 }
 
+// Riot's ladder, lowest first. Divisions run IV up to I inside each tier.
+const TIER_ORDER = [
+  "IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM",
+  "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER",
+];
+const DIVISION_ORDER = { IV: 0, III: 1, II: 2, I: 3 };
+
+// Sort key for a queue entry, biggest is best. Null when there's no rank to
+// compare, which the caller treats as "sort below anything ranked".
+function rankKey(q) {
+  if (!q || !q.tier) return null;
+  const tier = TIER_ORDER.indexOf(String(q.tier).toUpperCase());
+  if (tier < 0) return null;
+  // Master and above have no division; their tier index already places them
+  // above every divisioned tier, so a flat 0 here is fine.
+  const division = DIVISION_ORDER[String(q.division || "").toUpperCase()] ?? 0;
+  return [tier, division, Number(q.lp) || 0];
+}
+
+// Ranked accounts first (best to worst), then unranked, then any that Riot
+// wouldn't answer for.
+function accountGroup(acc) {
+  if (acc.unavailable) return 2;
+  return rankKey(acc.solo) ? 0 : 1;
+}
+
+function compareAccounts(a, b) {
+  const groupDiff = accountGroup(a) - accountGroup(b);
+  if (groupDiff !== 0) return groupDiff;
+
+  const ka = rankKey(a.solo);
+  const kb = rankKey(b.solo);
+  if (!ka || !kb) return 0; // same group, nothing to rank on: keep config order
+
+  for (let i = 0; i < ka.length; i++) {
+    if (ka[i] !== kb[i]) return kb[i] - ka[i];
+  }
+  return 0;
+}
+
 function renderAccounts() {
   if (!accountsData) return;
   accountsBody.replaceChildren();
 
-  for (const acc of accountsData.accounts || []) {
+  // Copy before sorting: accountsData is re-rendered whenever the live account
+  // changes, and the API response shouldn't be reordered under it.
+  const ordered = [...(accountsData.accounts || [])].sort(compareAccounts);
+
+  for (const acc of ordered) {
     const row = document.createElement("article");
     row.className = "account";
     if (acc.key === liveAccountKey) row.classList.add("is-live");
