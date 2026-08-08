@@ -3,6 +3,146 @@ const LIVE_POLL_MS = 60 * 1000;
 
 const parentHost = window.location.hostname || "localhost";
 
+// ---------------------------------------------------------------------------
+// Performance tier
+//
+// With hardware acceleration off, everything the compositor normally does for
+// free lands on the CPU: backdrop-filter, large animated blurs and the 3D
+// branch context go from cheap to crippling. There is no API that reports
+// whether acceleration is on, so rather than guess at the cause this measures
+// the symptom -- actual frame pacing -- which also catches weak CPUs and
+// battery saver. Falling behind switches the page to `perf-lite`, which drops
+// the expensive effects and keeps the movement.
+// ---------------------------------------------------------------------------
+const PERF_KEY = "perf:lite";
+const PERF_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// ~42fps. Comfortably below 60Hz without tripping on a 120Hz display, where a
+// genuinely smooth frame is 8ms and an occasional 16ms one is still fine.
+const SLOW_FRAME_MS = 24;
+
+const perfOverride = new URLSearchParams(location.search).get("lite");
+
+function setPerfLite(on) {
+  document.documentElement.classList.toggle("perf-lite", on);
+}
+
+function storePerfLite(on) {
+  try {
+    localStorage.setItem(PERF_KEY, JSON.stringify({ lite: on, at: Date.now() }));
+  } catch (err) {
+    /* Storage is an optimisation here, not a requirement. */
+  }
+}
+
+// A stored verdict is applied before the first paint of the heavy layers, so a
+// returning visitor isn't made to sit through the measurement window again.
+(function applyStoredPerfTier() {
+  if (perfOverride === "1") return setPerfLite(true);
+  if (perfOverride === "0") {
+    storePerfLite(false);
+    return;
+  }
+  try {
+    const raw = localStorage.getItem(PERF_KEY);
+    if (!raw) return;
+    const { lite, at } = JSON.parse(raw);
+    // Re-measure occasionally: a machine's circumstances change.
+    if (Date.now() - at < PERF_TTL_MS) setPerfLite(Boolean(lite));
+  } catch (err) {
+    /* Ignore a malformed value and just measure again. */
+  }
+})();
+
+// Direct signal. When acceleration is switched off, Chromium either refuses a
+// WebGL context outright or hands back its software rasteriser, and the name
+// says so. Read locally to pick a rendering tier and never sent anywhere.
+//
+// Returns true for "software", false for "a real GPU", and null when the
+// browser withholds the detail -- Firefox and Safari mask it -- in which case
+// the frame-pacing measurement below is the only thing to go on.
+function detectSoftwareRendering() {
+  let gl = null;
+  try {
+    const canvas = document.createElement("canvas");
+    gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    // No context at all is the usual shape of acceleration being disabled.
+    if (!gl) return true;
+
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = info
+      ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "")
+      : "";
+    if (!renderer) return null;
+    return /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i.test(
+      renderer
+    );
+  } catch (err) {
+    return null;
+  } finally {
+    // Contexts are a limited resource; this one existed only for its name.
+    if (gl) {
+      const lose = gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+    }
+  }
+}
+
+function measureFramePacing() {
+  if (perfOverride !== null) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  // A software rasteriser is conclusive on its own, and cheaper to establish
+  // than a second of sampling.
+  if (detectSoftwareRendering() === true) {
+    setPerfLite(true);
+    storePerfLite(true);
+    console.info("Reduced effects: software rendering detected. Add ?lite=0 to force them back on.");
+    return;
+  }
+
+  const deltas = [];
+  let last = performance.now();
+  // Skip the first frames: load, font swap and iframe attach all land there.
+  let warmup = 12;
+
+  function frame(now) {
+    const dt = now - last;
+    last = now;
+
+    // A backgrounded tab throttles rAF to a crawl; that is not the page being
+    // slow, so the sample is abandoned rather than counted.
+    if (document.hidden) return;
+
+    if (warmup > 0) {
+      warmup--;
+    } else {
+      deltas.push(dt);
+      if (deltas.length >= 70) {
+        deltas.sort((a, b) => a - b);
+        const median = deltas[Math.floor(deltas.length / 2)];
+        const lite = median > SLOW_FRAME_MS;
+        setPerfLite(lite);
+        storePerfLite(lite);
+        if (lite) {
+          console.info(
+            `Reduced effects: median frame ${median.toFixed(1)}ms. Add ?lite=0 to force them back on.`
+          );
+        }
+        return;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// Measure once the page has settled, so start-up work isn't mistaken for jank.
+if (document.readyState === "complete") {
+  setTimeout(measureFramePacing, 900);
+} else {
+  window.addEventListener("load", () => setTimeout(measureFramePacing, 900), { once: true });
+}
+
 // Keeping the live state in the tab title means a pinned or background tab
 // shows it without being switched to.
 const BASE_TITLE = document.title;
