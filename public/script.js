@@ -635,6 +635,14 @@ async function checkLeague() {
     // Refresh the hint while a game runs, so it stays valid for the
     // post-game lookup once the match ends.
     if (state === "in-game" && data.account) writeLeagueHint(data.account);
+
+    // The Accounts panel flags whichever account is playing. That is already
+    // known here, so it costs nothing rather than a sweep of its own.
+    const nextLiveKey = state === "in-game" ? data.account || null : null;
+    if (nextLiveKey !== liveAccountKey) {
+      liveAccountKey = nextLiveKey;
+      if (accountsData) renderAccounts();
+    }
     // Deliberately NOT cleared on a plain idle. Match-V5 does not publish a
     // match the instant it ends, so the first polls after a game legitimately
     // come back idle -- dropping the hint there meant we stopped looking right
@@ -933,6 +941,220 @@ document.addEventListener(
   },
   { passive: true }
 );
+
+// ---------------------------------------------------------------------------
+// Header dropdowns. `hidden` is the single source of truth for open state, so
+// a closed panel is out of the tab order and the accessibility tree entirely.
+// ---------------------------------------------------------------------------
+const menus = Array.from(document.querySelectorAll("[data-menu]")).map((root) => ({
+  root,
+  button: root.querySelector(".menu__button"),
+  panel: root.querySelector(".menu__panel"),
+}));
+
+function setMenuOpen(menu, open) {
+  menu.panel.hidden = !open;
+  menu.button.setAttribute("aria-expanded", String(open));
+}
+
+function closeAllMenus(except) {
+  for (const m of menus) if (m !== except) setMenuOpen(m, false);
+}
+
+for (const menu of menus) {
+  menu.button.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = menu.panel.hidden;
+    closeAllMenus(menu);
+    setMenuOpen(menu, willOpen);
+  });
+
+  // Choosing an item closes the menu; external links open in a new tab, so
+  // leaving it hanging open would be the only thing left on screen.
+  menu.panel.addEventListener("click", (e) => {
+    if (e.target.closest(".menu__item")) setMenuOpen(menu, false);
+  });
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-menu]")) closeAllMenus();
+});
+
+// ---------------------------------------------------------------------------
+// Accounts panel
+// ---------------------------------------------------------------------------
+const accountsModal = document.getElementById("accounts-modal");
+const accountsOpen = document.getElementById("accounts-open");
+const accountsBody = document.getElementById("accounts-body");
+const accountsStatus = document.getElementById("accounts-status");
+
+let accountsLoaded = false;
+let accountsData = null;
+// Which account the League widget currently reports in a game, so the panel
+// can flag it without a second sweep of its own.
+let liveAccountKey = null;
+let lastFocusedBeforeModal = null;
+
+function tierLabel(q) {
+  if (!q || !q.tier) return null;
+  const tier = q.tier.charAt(0) + q.tier.slice(1).toLowerCase();
+  // Apex tiers have a single division, so the numeral is noise.
+  const apex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(q.tier);
+  return apex || !q.division ? tier : `${tier} ${q.division}`;
+}
+
+function renderAccounts() {
+  if (!accountsData) return;
+  accountsBody.replaceChildren();
+
+  for (const acc of accountsData.accounts || []) {
+    const row = document.createElement("article");
+    row.className = "account";
+    if (acc.key === liveAccountKey) row.classList.add("is-live");
+
+    const id = document.createElement("div");
+    id.className = "account__id";
+
+    // textContent throughout: these are Riot-supplied names.
+    const name = document.createElement("span");
+    name.className = "account__name";
+    name.textContent = acc.name;
+    const tag = document.createElement("span");
+    tag.className = "account__tag";
+    tag.textContent = `#${acc.tag}`;
+    name.appendChild(tag);
+    id.appendChild(name);
+
+    const region = document.createElement("span");
+    region.className = "account__region";
+    region.textContent = acc.region;
+    id.appendChild(region);
+
+    if (acc.key === liveAccountKey) {
+      const live = document.createElement("span");
+      live.className = "account__live";
+      live.textContent = "In game";
+      id.appendChild(live);
+    }
+    row.appendChild(id);
+
+    const rank = document.createElement("div");
+    rank.className = "account__rank";
+    const label = tierLabel(acc.solo);
+    const tier = document.createElement("span");
+    tier.className = "account__tier";
+    if (acc.unavailable) {
+      tier.textContent = "Unavailable";
+    } else if (label) {
+      tier.textContent = label;
+      tier.dataset.tier = acc.solo.tier;
+    } else {
+      tier.textContent = "Unranked";
+    }
+    rank.appendChild(tier);
+
+    if (label) {
+      const lp = document.createElement("span");
+      lp.className = "account__lp";
+      lp.textContent = `${acc.solo.lp} LP`;
+      rank.appendChild(lp);
+    }
+    row.appendChild(rank);
+
+    const bits = [];
+    if (acc.solo && acc.solo.winRate !== null) {
+      bits.push(`${acc.solo.wins}W ${acc.solo.losses}L · ${acc.solo.winRate}%`);
+    }
+    const flexLabel = tierLabel(acc.flex);
+    if (flexLabel) bits.push(`Flex: ${flexLabel}`);
+    if (bits.length) {
+      const record = document.createElement("div");
+      record.className = "account__record";
+      record.textContent = bits.join("  ·  ");
+      row.appendChild(record);
+    }
+
+    accountsBody.appendChild(row);
+  }
+}
+
+async function loadAccounts() {
+  if (accountsLoaded) return;
+  try {
+    const res = await fetch("/api/accounts");
+    if (!res.ok) throw new Error(`accounts endpoint returned ${res.status}`);
+    const data = await res.json();
+
+    if (data.configured === false || !(data.accounts || []).length) {
+      accountsBody.replaceChildren();
+      accountsStatus.textContent = "Account data isn't available right now.";
+      accountsStatus.classList.remove("is-hidden");
+      return;
+    }
+
+    accountsData = data;
+    accountsLoaded = true;
+    accountsStatus.classList.add("is-hidden");
+    renderAccounts();
+  } catch (err) {
+    console.error("Accounts load failed:", err);
+    accountsBody.replaceChildren();
+    accountsStatus.textContent = "Couldn't load accounts right now.";
+    accountsStatus.classList.remove("is-hidden");
+  }
+}
+
+function setAccountsOpen(open) {
+  accountsModal.hidden = !open;
+  document.body.style.overflow = open ? "hidden" : "";
+
+  if (open) {
+    lastFocusedBeforeModal = document.activeElement;
+    loadAccounts();
+    accountsModal.querySelector(".modal__close").focus();
+  } else if (lastFocusedBeforeModal) {
+    // Return focus where it came from, so keyboard users aren't dumped at the
+    // top of the document.
+    lastFocusedBeforeModal.focus();
+    lastFocusedBeforeModal = null;
+  }
+}
+
+accountsOpen.addEventListener("click", () => setAccountsOpen(true));
+accountsModal.addEventListener("click", (e) => {
+  if (e.target.closest("[data-close]")) setAccountsOpen(false);
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!accountsModal.hidden) {
+    setAccountsOpen(false);
+    return;
+  }
+  if (menus.some((m) => !m.panel.hidden)) {
+    const open = menus.find((m) => !m.panel.hidden);
+    closeAllMenus();
+    open.button.focus();
+  }
+});
+
+// Keeps tabbing inside the dialog while it is open.
+accountsModal.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const focusable = accountsModal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
 
 let isChatLoaded = false;
 function loadChat() {

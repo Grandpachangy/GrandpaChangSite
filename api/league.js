@@ -10,19 +10,13 @@
 // Champion/spell names and icons come from Data Dragon, which is static and
 // needs no key.
 
-const ACCOUNTS = [
-  { gameName: "Vita Nihil", tagLine: "Empty", platform: "eun1" },
-  { gameName: "mors venit", tagLine: "mox", platform: "euw1" },
-  { gameName: "rojzz", tagLine: "euw", platform: "euw1" },
-  { gameName: "therookie", tagLine: "reubs", platform: "euw1" },
-  { gameName: "likethewind", tagLine: "woosh", platform: "euw1" },
-  { gameName: "exoispatrick", tagLine: "bottl", platform: "euw1" },
-  { gameName: "vita nihil", tagLine: "blank", platform: "euw1" },
-  { gameName: "ere", tagLine: "mrm", platform: "euw1" },
-];
-
-// EUW and EUNE both route through the europe cluster for Account-V1/Match-V5.
-const ACCOUNT_CLUSTER = "europe";
+const {
+  ACCOUNTS,
+  ACCOUNT_CLUSTER,
+  accountKey,
+  riotFetch,
+  getPuuid,
+} = require("./_riot");
 
 // How long after a match ends to keep showing the result.
 const POSTGAME_WINDOW_MS = 5 * 60 * 1000;
@@ -65,8 +59,6 @@ function queueLabel(game) {
   return mode.charAt(0) + mode.slice(1).toLowerCase();
 }
 
-const puuidCache = new Map();
-
 // Which account was last found in a game, and when. Checked first on the next
 // sweep: while a game runs that turns an 8-call sweep into a 1-call hit, which
 // matters because the personal-key budget (~50 req/min) is the binding
@@ -88,16 +80,12 @@ let staticCache = null;
 let staticCachedAt = 0;
 const STATIC_TTL_MS = 24 * 60 * 60 * 1000;
 
-async function riotFetch(url, apiKey) {
-  return fetch(url, { headers: { "X-Riot-Token": apiKey } });
-}
-
 // Resolves a client-supplied account hint to a known account, or null. The
 // string is compared against the configured list and never used to build a
 // request, so an arbitrary value can only ever fail to match.
 function accountFromHint(hint) {
   if (typeof hint !== "string" || !hint || hint.length > 64) return null;
-  return ACCOUNTS.find((a) => `${a.gameName}#${a.tagLine}` === hint) || null;
+  return ACCOUNTS.find((a) => accountKey(a) === hint) || null;
 }
 
 function accountsByPriority() {
@@ -163,26 +151,6 @@ function spellPayload(idx, spellId) {
     name: spell.name,
     icon: `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/spell/${spell.slug}.png`,
   };
-}
-
-async function getPuuid(account, apiKey) {
-  const key = `${account.gameName}#${account.tagLine}`;
-  if (puuidCache.has(key)) return puuidCache.get(key);
-
-  const url =
-    `https://${ACCOUNT_CLUSTER}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/` +
-    `${encodeURIComponent(account.gameName)}/${encodeURIComponent(account.tagLine)}`;
-
-  const res = await riotFetch(url, apiKey);
-  if (!res.ok) {
-    const err = new Error(`Account lookup failed for ${key}: ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-
-  const data = await res.json();
-  puuidCache.set(key, data.puuid);
-  return data.puuid;
 }
 
 async function getActiveGame(account, apiKey) {

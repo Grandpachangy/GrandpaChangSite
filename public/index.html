@@ -155,14 +155,41 @@
         <span class="brand-name">GrandpaChang</span>
       </div>
       <nav class="header-links" aria-label="Primary">
-        <a class="twitch-link" href="#about">About</a>
-        <a class="twitch-link" href="#socials">Socials</a>
-        <a class="twitch-link" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">
-          Twitch ↗
-        </a>
-        <a class="twitch-link" href="https://itzon.tv/grandpachang" target="_blank" rel="noopener">
-          ITZon ↗
-        </a>
+        <div class="menu" data-menu>
+          <button type="button" class="twitch-link nav-btn menu__button" aria-expanded="false"
+                  aria-haspopup="true" aria-controls="menu-live">
+            Live <span class="menu__caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="menu__panel" id="menu-live" role="menu" hidden>
+            <a class="menu__item" role="menuitem" href="https://twitch.tv/grandpachang" target="_blank" rel="noopener">
+              <span class="menu__mark" aria-hidden="true">◆</span>Twitch
+              <span class="menu__ext" aria-hidden="true">↗</span>
+            </a>
+            <a class="menu__item" role="menuitem" href="https://itzon.tv/grandpachang" target="_blank" rel="noopener">
+              <span class="menu__mark" aria-hidden="true">✦</span>ITZon
+              <span class="menu__ext" aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="menu" data-menu>
+          <button type="button" class="twitch-link nav-btn menu__button" aria-expanded="false"
+                  aria-haspopup="true" aria-controls="menu-more">
+            More <span class="menu__caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="menu__panel" id="menu-more" role="menu" hidden>
+            <a class="menu__item" role="menuitem" href="#about">
+              <span class="menu__mark" aria-hidden="true">☾</span>About
+            </a>
+            <a class="menu__item" role="menuitem" href="#socials">
+              <span class="menu__mark" aria-hidden="true">✧</span>Socials
+            </a>
+          </div>
+        </div>
+
+        <button type="button" class="twitch-link nav-btn" id="accounts-open" aria-haspopup="dialog">
+          <span class="menu__mark" aria-hidden="true">⚔</span>Accounts
+        </button>
       </nav>
     </div>
   </header>
@@ -362,6 +389,31 @@
       </div>
     </section>
   </main>
+
+  <!-- Accounts panel. Overlays the page rather than living in the flow, so it
+       can be opened and dismissed from anywhere without navigating away. -->
+  <div id="accounts-modal" class="modal" role="dialog" aria-modal="true"
+       aria-labelledby="accounts-title" hidden>
+    <div class="modal__scrim" data-close></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__head">
+        <h2 class="modal__title" id="accounts-title">League accounts</h2>
+        <button type="button" class="modal__close" data-close aria-label="Close accounts">✕</button>
+      </header>
+
+      <div id="accounts-body" class="accounts">
+        <!-- Placeholder rows hold the panel's height while the ranks load, so
+             it doesn't resize under the pointer once data arrives. -->
+        <div class="account account--skeleton" aria-hidden="true"></div>
+        <div class="account account--skeleton" aria-hidden="true"></div>
+        <div class="account account--skeleton" aria-hidden="true"></div>
+        <div class="account account--skeleton" aria-hidden="true"></div>
+      </div>
+
+      <p id="accounts-status" class="modal__note is-hidden" role="status"></p>
+      <p class="modal__note">Ranked Solo/Duo standing. A live game is flagged as it happens.</p>
+    </div>
+  </div>
 
   <footer class="site-footer">
     <p>Not affiliated with Twitch Interactive, Inc. Video played via Twitch's official embedded player.</p>
