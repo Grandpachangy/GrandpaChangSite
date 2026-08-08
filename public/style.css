@@ -587,6 +587,53 @@ body {
   will-change: transform;
 }
 
+/* Keyboard focus. The default ring is a thin dark outline that all but
+   disappears against this palette, so every focusable control gets an
+   explicit moonlit ring. :focus-visible rather than :focus, so it appears
+   for keyboard and assistive navigation without ringing on mouse clicks. */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible,
+iframe:focus-visible {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.twitch-link:focus-visible,
+.social-link:focus-visible,
+.popout-restore-btn:focus-visible {
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.vods-nav:focus-visible,
+.vod-card__play:focus-visible {
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Lets keyboard users jump straight to the stream without tabbing the nav.
+   Off-screen until focused. */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 1000;
+  padding: 0.55rem 1rem;
+  border-radius: 0 0 10px 10px;
+  background: var(--surface-hi);
+  border: 1px solid var(--edge-hi);
+  color: var(--moon);
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: top 0.2s var(--ease-out);
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
 /* Pressed feedback shared by every control on the page. */
 button:active,
 .twitch-link:active,

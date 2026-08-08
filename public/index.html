@@ -4,6 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GrandpaChang | Live &amp; VODs</title>
+  <meta name="description" content="Watch GrandpaChang live, catch up on recent VODs, and see what he's playing in League of Legends right now." />
+  <meta name="theme-color" content="#0d0718" />
+  <link rel="canonical" href="https://grandpachang.com/" />
+
+  <!-- Link previews: without these, sharing the site in Discord, Twitter or
+       a Twitch panel renders as a bare URL with no title or image. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="GrandpaChang" />
+  <meta property="og:title" content="GrandpaChang | Live &amp; VODs" />
+  <meta property="og:description" content="Watch live, catch up on recent VODs, and see what he's playing in League of Legends right now." />
+  <meta property="og:url" content="https://grandpachang.com/" />
+  <meta property="og:image" content="https://grandpachang.com/og.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="GrandpaChang — live streams, VODs and League status" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="GrandpaChang | Live &amp; VODs" />
+  <meta name="twitter:description" content="Watch live, catch up on recent VODs, and see what he's playing in League of Legends right now." />
+  <meta name="twitter:image" content="https://grandpachang.com/og.jpg" />
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+
   <link rel="preconnect" href="https://itzon.tv" />
   <link rel="preconnect" href="https://player.twitch.tv" />
   <link rel="preconnect" href="https://static-cdn.jtvnw.net" crossorigin />
@@ -15,6 +40,8 @@
   <script>document.documentElement.className += " js";</script>
 </head>
 <body>
+  <a class="skip-link" href="#watch">Skip to the stream</a>
+
   <!-- Moonlit storm backdrop. Layers run back to front; each one that moves
        drives only transform/opacity so the compositor handles it. Elements
        with data-parallax are translated on scroll by the factor given. -->
@@ -136,7 +163,7 @@
       </div>
     </section>
 
-    <section class="watch-section">
+    <section class="watch-section" id="watch" tabindex="-1">
       <div class="watch-layout" id="watch-layout">
         <div class="stage-column">
           <div id="offline-panel" class="offline-panel">

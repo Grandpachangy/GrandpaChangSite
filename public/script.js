@@ -3,6 +3,14 @@ const LIVE_POLL_MS = 60 * 1000;
 
 const parentHost = window.location.hostname || "localhost";
 
+// Keeping the live state in the tab title means a pinned or background tab
+// shows it without being switched to.
+const BASE_TITLE = document.title;
+function setTitleLive(isLive) {
+  const wanted = isLive ? `\u{1F534} LIVE \u00B7 ${BASE_TITLE}` : BASE_TITLE;
+  if (document.title !== wanted) document.title = wanted;
+}
+
 const liveBanner = document.getElementById("live-banner");
 const liveTitleEl = document.getElementById("live-title");
 const liveViewersEl = document.getElementById("live-viewers");
@@ -161,6 +169,7 @@ async function checkLive() {
     liveBanner.classList.remove("is-hidden");
     liveTitleEl.textContent = "Preview mode — showing the live layout, not actually live";
     liveViewersEl.textContent = "";
+    setTitleLive(true);
     showLivePlayer();
     return;
   }
@@ -168,6 +177,8 @@ async function checkLive() {
   try {
     const res = await fetch("/api/live");
     const data = await res.json();
+
+    setTitleLive(Boolean(data.live));
 
     if (data.live) {
       liveBanner.classList.remove("is-hidden");
@@ -407,7 +418,9 @@ const leagueBans = document.getElementById("league-bans");
 const leagueBansBody = document.getElementById("league-bans-body");
 
 let leagueOpen = false;
-let leagueLastState = "idle";
+// null until a poll reports something, so the first result after a page load
+// isn't mistaken for a state change and used to force the card open.
+let leagueLastState = null;
 let leagueTimer = null;
 let leagueStopped = false;
 
@@ -512,13 +525,32 @@ function renderLineup(target, champs) {
   }
 }
 
-function setLeagueOpen(open) {
+const LEAGUE_OPEN_KEY = "league:cardOpen";
+
+function setLeagueOpen(open, remember) {
   leagueOpen = open;
   leagueCard.classList.toggle("is-collapsed", !open);
   leagueToggle.setAttribute("aria-expanded", String(open));
+  // Only a deliberate toggle updates the preference; auto-opening on a new
+  // game must not overwrite what the visitor chose.
+  if (remember) {
+    try {
+      localStorage.setItem(LEAGUE_OPEN_KEY, open ? "1" : "0");
+    } catch (err) {
+      /* Preference is a nicety; storage being unavailable is not an error. */
+    }
+  }
 }
 
-leagueToggle.addEventListener("click", () => setLeagueOpen(!leagueOpen));
+// Restore the visitor's last choice, so a refresh mid-game doesn't reopen a
+// card they had deliberately collapsed.
+try {
+  if (localStorage.getItem(LEAGUE_OPEN_KEY) === "1") setLeagueOpen(true);
+} catch (err) {
+  /* Ignore: falls back to the collapsed default. */
+}
+
+leagueToggle.addEventListener("click", () => setLeagueOpen(!leagueOpen, true));
 
 function startLeaguePolling() {
   if (leagueStopped || leagueTimer) return;
@@ -641,7 +673,11 @@ async function checkLeague() {
     // Auto-open on entering a game and again when the result lands, since
     // both are moments worth surfacing. Manual toggles within a state are
     // left alone.
+    // Auto-open only on a transition this page actually witnessed. On the
+    // first poll after a load leagueLastState is null, so an already-running
+    // game no longer forces the card open over a deliberate collapse.
     if (
+      leagueLastState !== null &&
       effectiveState !== leagueLastState &&
       (effectiveState === "in-game" || effectiveState === "post-game")
     ) {
