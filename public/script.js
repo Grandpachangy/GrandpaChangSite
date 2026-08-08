@@ -336,6 +336,7 @@ function setSidestream(open) {
   sidestreamFrame.src = open
     ? `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=true`
     : "about:blank";
+  syncDockHeight();
 }
 
 sidestreamToggle.addEventListener("click", () => setSidestream(!isSidestreamOpen));
@@ -513,6 +514,22 @@ if (aboutAvatarImg) {
   if (aboutAvatarImg.complete && aboutAvatarImg.naturalWidth === 0) markMissing();
 }
 
+// The now-playing card and the side stream are docked over the bottom-left
+// corner, which is where the footer ends up once you scroll to the end of the
+// page -- the copyright line was landing underneath them. Publishing the
+// stack's height lets the footer reserve exactly that much room, and only
+// while something is actually docked there.
+const floatingStack = document.querySelector(".floating-stack");
+function syncDockHeight() {
+  if (!floatingStack) return;
+  const h = floatingStack.getBoundingClientRect().height;
+  document.documentElement.style.setProperty("--dock-h", `${Math.round(h)}px`);
+}
+// Called from the two places that dock or undock a card, plus on resize --
+// the cards reflow with the viewport.
+window.addEventListener("resize", syncDockHeight);
+syncDockHeight();
+
 // Now playing, via Last.fm. Hidden entirely unless a track is actually
 // playing, so it stays out of the way when there's nothing to show.
 const NOWPLAYING_POLL_MS = 10 * 1000;
@@ -583,6 +600,8 @@ async function checkNowPlaying() {
   } catch (err) {
     nowPlayingEl.classList.add("is-hidden");
     console.error("Now playing check failed:", err);
+  } finally {
+    syncDockHeight();
   }
 }
 
@@ -1345,6 +1364,11 @@ accountsModal.addEventListener("keydown", (e) => {
     first.focus();
   }
 });
+
+// The markup carries a hardcoded year so the notice reads correctly with
+// scripting off; this keeps it current for everyone else.
+const footerYear = document.getElementById("footer-year");
+if (footerYear) footerYear.textContent = String(new Date().getFullYear());
 
 let isChatLoaded = false;
 function loadChat() {

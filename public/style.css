@@ -2351,13 +2351,26 @@ html:not(.js) h2::after {
 .site-footer {
   text-align: center;
   padding: 2rem;
+  /* Clear the docked cards in the bottom-left corner. --dock-h is published
+     by the script and is 0px whenever nothing is docked. */
+  padding-bottom: calc(2rem + var(--dock-h, 0px));
   color: var(--moon-dim);
   font-size: 0.75rem;
   opacity: 0.7;
 }
 
+/* Sits below the disclaimer, separated by a hairline so the two lines read
+   as distinct notices rather than one run-on paragraph. */
+.site-footer__legal {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--edge);
+  display: inline-block;
+  letter-spacing: 0.04em;
+}
+
 @media (max-width: 640px) {
-  /* Four pills plus the brand can't share a row at phone widths -- side by
+  /* The brand and the pills can't share a row at phone widths -- side by
      side they wrapped one-per-line and pushed the header past 190px tall.
      Stacking the brand above a single tightened row keeps it near 100px. */
   .site-header__inner {

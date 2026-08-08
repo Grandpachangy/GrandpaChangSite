@@ -196,21 +196,9 @@
           </div>
         </div>
 
-        <div class="menu" data-menu>
-          <button type="button" class="twitch-link nav-btn menu__button" aria-expanded="false"
-                  aria-haspopup="true" aria-controls="menu-more">
-            More <span class="menu__caret" aria-hidden="true">▾</span>
-          </button>
-          <div class="menu__panel" id="menu-more" role="menu" hidden>
-            <a class="menu__item" role="menuitem" href="#about">
-              <span class="menu__mark" aria-hidden="true">☾</span>About
-            </a>
-            <a class="menu__item" role="menuitem" href="#socials">
-              <span class="menu__mark" aria-hidden="true">✧</span>Socials
-            </a>
-          </div>
-        </div>
-
+        <!-- About and Socials used to live in a "More" dropdown here. Both
+             sections sit a short scroll down the page, so the dropdown was
+             a second route to content already within reach. -->
         <button type="button" class="twitch-link nav-btn" id="accounts-open" aria-haspopup="dialog">
           <span class="menu__mark" aria-hidden="true">⚔</span>Accounts
         </button>
@@ -441,6 +429,9 @@
 
   <footer class="site-footer">
     <p>Not affiliated with Twitch Interactive, Inc. Video played via Twitch's official embedded player.</p>
+    <p class="site-footer__legal">
+      &copy; <span id="footer-year">2026</span> GrandpaChang. All rights reserved.
+    </p>
   </footer>
 
   <script src="script.js"></script>
