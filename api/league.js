@@ -257,7 +257,9 @@ async function getPostGame(account, apiKey) {
   // consume it entirely when publishing took longer than the window itself.
   if (!endedAt || now - endedAt > POSTGAME_LOOKUP_WINDOW_MS) {
     lastPostGameMiss = endedAt
-      ? `latest match ended ${Math.round((now - endedAt) / 1000)}s ago`
+      ? `latest match ${ids[0]} queue=${info.queueId} mode=${info.gameMode} ended ${Math.round(
+          (now - endedAt) / 1000
+        )}s ago`
       : "no gameEndTimestamp";
     postGameCache = null;
     postGameCacheKey = cacheKey;
