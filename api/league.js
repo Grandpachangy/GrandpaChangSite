@@ -48,6 +48,9 @@ const QUEUE_NAMES = {
   1710: "Arena",
   1900: "URF",
   2300: "Brawl",
+  // Riot's internal gameMode for this one is "KIWI", which is what a live game
+  // displayed before it was mapped. Ids verified against Riot's queues.json.
+  2400: "ARAM: Mayhem",
 };
 
 // Riot's gameMode for an unmapped queue is an internal codename in caps
