@@ -77,6 +77,7 @@ let lastActiveSeenAt = 0;
 
 // Post-game results are re-read at most this often, rather than every sweep.
 let postGameCache = null;
+let postGameCacheKey = null;
 let postGameCachedAt = 0;
 const POSTGAME_CACHE_MS = 45 * 1000;
 
@@ -86,6 +87,14 @@ const STATIC_TTL_MS = 24 * 60 * 60 * 1000;
 
 async function riotFetch(url, apiKey) {
   return fetch(url, { headers: { "X-Riot-Token": apiKey } });
+}
+
+// Resolves a client-supplied account hint to a known account, or null. The
+// string is compared against the configured list and never used to build a
+// request, so an arbitrary value can only ever fail to match.
+function accountFromHint(hint) {
+  if (typeof hint !== "string" || !hint || hint.length > 64) return null;
+  return ACCOUNTS.find((a) => `${a.gameName}#${a.tagLine}` === hint) || null;
 }
 
 function accountsByPriority() {
@@ -199,7 +208,14 @@ async function getActiveGame(account, apiKey) {
 // Most recent finished match, if it ended inside the post-game window.
 async function getPostGame(account, apiKey) {
   const now = Date.now();
-  if (postGameCache && now - postGameCachedAt < POSTGAME_CACHE_MS) {
+  const cacheKey = `${account.gameName}#${account.tagLine}`;
+  // Keyed by account: with the hint in play a request can now ask about a
+  // different account than the one that filled the cache.
+  if (
+    postGameCache &&
+    postGameCacheKey === cacheKey &&
+    now - postGameCachedAt < POSTGAME_CACHE_MS
+  ) {
     return postGameCache;
   }
 
@@ -224,6 +240,7 @@ async function getPostGame(account, apiKey) {
   const endedAt = info.gameEndTimestamp || 0;
   if (!endedAt || now - endedAt > POSTGAME_WINDOW_MS) {
     postGameCache = null;
+    postGameCacheKey = cacheKey;
     postGameCachedAt = now;
     return null;
   }
@@ -240,12 +257,13 @@ async function getPostGame(account, apiKey) {
     deaths: me.deaths ?? 0,
     assists: me.assists ?? 0,
     cs: (me.totalMinionsKilled ?? 0) + (me.neutralMinionsKilled ?? 0),
-    queue: QUEUE_NAMES[info.queueId] || info.gameMode || "Custom",
+    queue: queueLabel({ gameQueueConfigId: info.queueId, gameMode: info.gameMode }),
     durationSec: info.gameDuration ?? null,
     endedAt,
   };
 
   postGameCache = result;
+  postGameCacheKey = cacheKey;
   postGameCachedAt = now;
   return result;
 }
@@ -362,26 +380,37 @@ module.exports = async (req, res) => {
 
     // Nobody in a game. If someone was playing recently, check whether their
     // match just finished so the post-game card can take over.
-    if (lastActiveKey && Date.now() - lastActiveSeenAt < POSTGAME_LOOKUP_WINDOW_MS) {
-      const account = ACCOUNTS.find(
-        (a) => `${a.gameName}#${a.tagLine}` === lastActiveKey
-      );
-      if (account) {
-        try {
-          const post = await getPostGame(account, apiKey);
-          if (post) {
-            res.setHeader("Cache-Control", "s-maxage=15");
-            res.status(200).json({
-              configured: true,
-              keyValid: true,
-              state: "post-game",
-              ...post,
-            });
-            return;
-          }
-        } catch (err) {
-          console.error("league: post-game lookup failed:", err.message);
+    //
+    // Which account that was is remembered in module scope, which a serverless
+    // instance is free to discard between requests -- so on a cold start the
+    // lookup was skipped and a finished game silently reported as idle. The
+    // page therefore passes back the account it last saw in a game, giving the
+    // continuity the server can't keep. The hint only ever selects an entry
+    // from ACCOUNTS, so it can never reach a Riot URL, and how long a result
+    // stays visible is still decided by the match's own end timestamp rather
+    // than by anything the client claims.
+    const serverRemembers =
+      lastActiveKey && Date.now() - lastActiveSeenAt < POSTGAME_LOOKUP_WINDOW_MS;
+    const account = serverRemembers
+      ? ACCOUNTS.find((a) => `${a.gameName}#${a.tagLine}` === lastActiveKey)
+      : accountFromHint(req.query && req.query.last);
+
+    if (account) {
+      try {
+        const post = await getPostGame(account, apiKey);
+        if (post) {
+          res.setHeader("Cache-Control", "s-maxage=15");
+          res.status(200).json({
+            configured: true,
+            keyValid: true,
+            state: "post-game",
+            account: `${account.gameName}#${account.tagLine}`,
+            ...post,
+          });
+          return;
         }
+      } catch (err) {
+        console.error("league: post-game lookup failed:", err.message);
       }
     }
 

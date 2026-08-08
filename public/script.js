@@ -509,9 +509,49 @@ function stopLeaguePolling() {
   leagueTimer = null;
 }
 
+// The account last seen in a game. The server keeps the same hint in module
+// scope, but a serverless instance may be recycled at any moment, and when
+// that happened the post-game lookup was skipped and a finished match showed
+// as idle. The page outlives those instances, so it carries the continuity.
+// Stored so it also survives a reload -- refreshing right after a game was
+// exactly when the result went missing.
+const LEAGUE_HINT_KEY = "league:lastAccount";
+const LEAGUE_HINT_WINDOW_MS = 12 * 60 * 1000;
+
+function readLeagueHint() {
+  try {
+    const raw = localStorage.getItem(LEAGUE_HINT_KEY);
+    if (!raw) return null;
+    const { account, at } = JSON.parse(raw);
+    if (!account || Date.now() - at > LEAGUE_HINT_WINDOW_MS) return null;
+    return account;
+  } catch (err) {
+    // Private browsing can throw on access, and a malformed value is not
+    // worth failing the poll over.
+    return null;
+  }
+}
+
+function writeLeagueHint(account) {
+  try {
+    if (account) {
+      localStorage.setItem(LEAGUE_HINT_KEY, JSON.stringify({ account, at: Date.now() }));
+    } else {
+      localStorage.removeItem(LEAGUE_HINT_KEY);
+    }
+  } catch (err) {
+    /* Nothing to do: the hint is an optimisation, not a requirement. */
+  }
+}
+
+function leagueEndpoint() {
+  const hint = readLeagueHint();
+  return hint ? `/api/league?last=${encodeURIComponent(hint)}` : "/api/league";
+}
+
 async function checkLeague() {
   try {
-    const res = await fetch("/api/league");
+    const res = await fetch(leagueEndpoint());
     // A 500 body has no `state`, which used to fall through to the idle
     // branch and knock the card out of its in-game state.
     if (!res.ok) throw new Error(`league endpoint returned ${res.status}`);
@@ -534,6 +574,13 @@ async function checkLeague() {
     leagueCard.classList.toggle("is-in-game", state === "in-game");
     leagueCard.classList.toggle("is-win", state === "post-game" && data.win === true);
     leagueCard.classList.toggle("is-loss", state === "post-game" && data.win === false);
+
+    // Refresh the hint while a game runs, so it stays valid for the
+    // post-game lookup once the match ends.
+    if (state === "in-game" && data.account) writeLeagueHint(data.account);
+    // Once idle, the result has already been shown or the window has passed;
+    // dropping it stops needless match-history lookups on later polls.
+    if (state === "idle") writeLeagueHint(null);
 
     if (state === "in-game") {
       renderInGame(data);
