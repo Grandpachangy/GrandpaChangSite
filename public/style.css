@@ -383,30 +383,66 @@ body {
    anchoring corner, but the blossoms swing wider and on a different cycle,
    so the tips drift a couple of pixels against the wood they hang from --
    which is what reads as a rustle, rather than the whole thing waving. */
+/* The mask and opacity live here, and both would force transform-style back
+   to flat -- so the 3D context is a separate wrapper inside. */
 .branch {
   position: absolute;
   opacity: 0.95;
-  animation: rustle var(--rustle-dur, 15s) ease-in-out var(--rustle-delay, 0s) infinite;
+  perspective: 900px;
+}
+
+/* The actual 3D context. Layers sit at different depths, so swinging this on
+   rotateY parallaxes the blossoms against the wood behind them rather than
+   sliding a flat picture about. */
+.branch__depth {
+  position: absolute;
+  inset: 0;
+  transform-origin: inherit;
+  transform-style: preserve-3d;
+  animation: rustle-3d var(--rustle-dur, 15s) ease-in-out var(--rustle-delay, 0s) infinite;
   will-change: transform;
 }
 
+.branch__rim,
 .branch__limbs,
 .branch__blossoms {
   position: absolute;
   inset: 0;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .branch__limbs {
-  background-repeat: no-repeat;
-  background-size: contain;
   background-image: var(--limbs);
+  transform: translateZ(0);
+}
+
+/* Moonlight catching the branch. A copy of the limbs, tinted and nudged
+   toward the moon, sitting just behind the black ones -- so it survives only
+   along the moon-facing edge and reads as a lit rim rather than a glow. The
+   offset is the same for every branch, since they share one light source. */
+.branch__rim {
+  background: linear-gradient(205deg, rgba(236, 230, 255, 0.5), rgba(160, 107, 255, 0.2) 60%, transparent);
+  -webkit-mask-image: var(--limbs);
+  mask-image: var(--limbs);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  transform: translateZ(-1px) translate(1.2px, -1.2px);
 }
 
 /* The blossom SVG masks a violet wash rather than being painted flat black.
    Black-on-near-black made the branches disappear, and the reference art has
    lit blossoms on a dark tree anyway. */
+/* Blossoms stand well in front of the wood. The depth does two things at
+   once: perspective scales them fractionally larger, and any rotateY on the
+   wrapper slides them across the limbs behind. A radial highlight aimed at
+   the moon keeps them from reading as flat cut-outs. */
 .branch__blossoms {
-  background: linear-gradient(150deg, var(--violet-soft), var(--magenta));
+  background:
+    radial-gradient(circle at 68% 26%, rgba(255, 255, 255, 0.5), transparent 34%),
+    linear-gradient(150deg, var(--violet-soft), var(--magenta));
   -webkit-mask-image: var(--blossoms);
   mask-image: var(--blossoms);
   -webkit-mask-repeat: no-repeat;
@@ -428,6 +464,7 @@ body {
   width: 300px;
   height: 286px;
   transform-origin: top left;
+  perspective-origin: top left;
   --rustle-dur: 15s;
   --tips-dur: 9s;
   -webkit-mask-image: linear-gradient(to bottom right, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 90%, transparent 100%);
@@ -443,6 +480,7 @@ body {
   width: 262px;
   height: 240px;
   transform-origin: top right;
+  perspective-origin: top right;
   --rustle-dur: 18s;
   --tips-dur: 11s;
   --rustle-delay: -6s;
@@ -459,6 +497,7 @@ body {
   width: 262px;
   height: 277px;
   transform-origin: bottom left;
+  perspective-origin: bottom left;
   --rustle-dur: 13s;
   --tips-dur: 8s;
   --rustle-delay: -3s;
@@ -475,6 +514,7 @@ body {
   width: 234px;
   height: 218px;
   transform-origin: bottom right;
+  perspective-origin: bottom right;
   --rustle-dur: 16s;
   --tips-dur: 10s;
   --rustle-delay: -9s;
@@ -485,26 +525,28 @@ body {
 
 /* Irregular on purpose -- an even back-and-forth reads as a metronome, not
    wind. The larger step near 63% is a gust. 0% and 100% match so it loops. */
-@keyframes rustle {
-  0%, 100% { transform: rotate(-0.4deg); }
-  14% { transform: rotate(0.22deg); }
-  27% { transform: rotate(-0.16deg); }
-  41% { transform: rotate(0.46deg); }
-  55% { transform: rotate(-0.3deg); }
-  63% { transform: rotate(1deg); }
-  69% { transform: rotate(-0.42deg); }
-  75% { transform: rotate(0.7deg); }
-  86% { transform: rotate(-0.2deg); }
+@keyframes rustle-3d {
+  0%, 100% { transform: rotateZ(-0.4deg) rotateY(-1.8deg) rotateX(0.5deg); }
+  14% { transform: rotateZ(0.22deg) rotateY(1.2deg) rotateX(-0.35deg); }
+  27% { transform: rotateZ(-0.16deg) rotateY(-0.7deg) rotateX(0.2deg); }
+  41% { transform: rotateZ(0.46deg) rotateY(2.2deg) rotateX(-0.55deg); }
+  55% { transform: rotateZ(-0.3deg) rotateY(-1.3deg) rotateX(0.4deg); }
+  63% { transform: rotateZ(1deg) rotateY(3.4deg) rotateX(-0.9deg); }
+  69% { transform: rotateZ(-0.42deg) rotateY(-1.5deg) rotateX(0.45deg); }
+  75% { transform: rotateZ(0.7deg) rotateY(2.4deg) rotateX(-0.6deg); }
+  86% { transform: rotateZ(-0.2deg) rotateY(-0.9deg) rotateX(0.3deg); }
 }
 
+/* translateZ is restated in every step: this animates `transform` wholesale,
+   so omitting it would flatten the blossoms back onto the limbs. */
 @keyframes rustle-tips {
-  0%, 100% { transform: rotate(0.5deg); }
-  17% { transform: rotate(-0.35deg); }
-  33% { transform: rotate(0.62deg); }
-  48% { transform: rotate(-0.5deg); }
-  61% { transform: rotate(0.9deg); }
-  72% { transform: rotate(-0.66deg); }
-  88% { transform: rotate(0.3deg); }
+  0%, 100% { transform: translateZ(26px) rotate(0.5deg); }
+  17% { transform: translateZ(26px) rotate(-0.35deg); }
+  33% { transform: translateZ(26px) rotate(0.62deg); }
+  48% { transform: translateZ(26px) rotate(-0.5deg); }
+  61% { transform: translateZ(26px) rotate(0.9deg); }
+  72% { transform: translateZ(26px) rotate(-0.66deg); }
+  88% { transform: translateZ(26px) rotate(0.3deg); }
 }
 
 /* Darkens the page edges so content in the middle holds attention. */
@@ -2007,6 +2049,7 @@ html:not(.js) h2::after {
   .moon__corona,
   .clouds,
   .branch,
+  .branch__depth,
   .branch__blossoms,
   .brand-mark,
   .offline-panel__mark,
