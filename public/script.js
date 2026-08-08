@@ -674,26 +674,46 @@ function renderInGame(data) {
     leagueBans.classList.add("is-hidden");
   }
 
-  // gameLength is the source that matches the clock on the player's screen.
-  // Riot refreshes it in coarse ~60s steps, so a given read is anywhere from
-  // current to a minute behind; `fetchedAt` covers the time it then spent in
-  // the edge cache, and startGameClock's forward-only rule does the rest --
-  // stale reads are ignored while the local tick keeps running, so the display
-  // settles on the accurate value each refresh lands on.
+  // Two ways to place the clock, and they fail in opposite ways.
   //
-  // gameStartTime is only a fallback, and it sits on the far side of the real
-  // clock: it precedes 0:00 by about a minute, so it runs as far ahead as
-  // gameLength runs behind. Hence the same constant, subtracted.
-  if (typeof data.gameLengthSec === "number") {
-    const cacheAgeSec =
-      typeof data.fetchedAt === "number"
-        ? Math.max(0, (Date.now() - data.fetchedAt) / 1000)
-        : 0;
-    startGameClock(data.gameLengthSec + cacheAgeSec + CLOCK_OFFSET_SEC, data.gameId);
-  } else if (typeof data.gameStartedAt === "number" && data.gameStartedAt > 0) {
-    startGameClock((Date.now() - data.gameStartedAt) / 1000 - CLOCK_OFFSET_SEC, data.gameId);
-  } else {
+  // gameLength matches the clock on the player's screen, but Riot refreshes it
+  // in coarse ~60s steps, so any single read is between current and a minute
+  // behind. Across repeated polls that is harmless: the forward-only rule
+  // ignores stale reads while the local tick keeps running, so the display
+  // settles onto the accurate value each refresh lands on.
+  //
+  // gameStartTime is continuous rather than stepped, so it is never stale, but
+  // it sits on the far side of the real clock -- preceding 0:00 by about the
+  // same minute -- and how long that is depends on how long the match took to
+  // load, which varies per game.
+  //
+  // So: gameStartTime for the very first anchor, gameLength for everything
+  // after. A fresh page has no running display to protect it, so a stale
+  // gameLength would be shown as-is -- that was the ~1 minute dip after a
+  // refresh, which then jumped up once a current read arrived. Steady state
+  // stays on gameLength, where the per-game loading variance can't reach it.
+  const cacheAgeSec =
+    typeof data.fetchedAt === "number"
+      ? Math.max(0, (Date.now() - data.fetchedAt) / 1000)
+      : 0;
+  const fromLength =
+    typeof data.gameLengthSec === "number"
+      ? data.gameLengthSec + cacheAgeSec + CLOCK_OFFSET_SEC
+      : null;
+  const fromStart =
+    typeof data.gameStartedAt === "number" && data.gameStartedAt > 0
+      ? (Date.now() - data.gameStartedAt) / 1000 - CLOCK_OFFSET_SEC
+      : null;
+
+  const isFirstAnchor = gameClockBaseSec === null;
+  const base = isFirstAnchor
+    ? fromStart ?? fromLength
+    : fromLength ?? fromStart;
+
+  if (base === null) {
     stopGameClock();
+  } else {
+    startGameClock(base, data.gameId);
   }
 }
 
