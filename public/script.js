@@ -36,6 +36,10 @@ function isPerfLite() {
 
 function setPerfLite(on) {
   document.documentElement.classList.toggle("perf-lite", on);
+  // Measurement can flip the tier a couple of seconds after load, so the
+  // settings switch is synced from here rather than only being read once.
+  const toggle = document.getElementById("perf-toggle");
+  if (toggle) toggle.checked = on;
 }
 
 function storePerfLite(on) {
@@ -1195,6 +1199,46 @@ for (const menu of menus) {
 document.addEventListener("click", (e) => {
   if (!e.target.closest("[data-menu]")) closeAllMenus();
 });
+
+// ---------------------------------------------------------------------------
+// Display settings
+//
+// Automatic detection catches a software rasteriser and a slow main thread,
+// but a weak GPU paired with an idle main thread looks perfectly healthy from
+// JavaScript and slips through. This is the escape hatch for that, and it has
+// to be somewhere a visitor can actually find -- a ?lite= parameter only helps
+// the people who already know to ask.
+// ---------------------------------------------------------------------------
+const perfToggle = document.getElementById("perf-toggle");
+const perfState = document.getElementById("perf-state");
+
+function describePerfState() {
+  if (!perfState) return;
+  perfState.textContent =
+    readPerfChoice() === null
+      ? "Currently set automatically for this device."
+      : "Saved for this browser.";
+}
+
+if (perfToggle) {
+  perfToggle.checked = isPerfLite();
+  describePerfState();
+
+  perfToggle.addEventListener("change", () => {
+    const on = perfToggle.checked;
+    setPerfLite(on);
+    try {
+      // An explicit choice, which the head script prefers over anything
+      // measured and which never expires. Dropping the measured verdict too
+      // stops the two disagreeing if the choice is ever cleared.
+      localStorage.setItem(PERF_CHOICE_KEY, on ? "1" : "0");
+      localStorage.removeItem(PERF_KEY);
+    } catch (err) {
+      /* Without storage the choice lasts for this page view only. */
+    }
+    describePerfState();
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Accounts panel

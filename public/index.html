@@ -202,6 +202,28 @@
         <button type="button" class="twitch-link nav-btn" id="accounts-open" aria-haspopup="dialog">
           <span class="menu__mark" aria-hidden="true">⚔</span>Accounts
         </button>
+
+        <!-- Display settings. The reduced tier is picked automatically, but the
+             detection can't see every slow machine, so it needs a control
+             anyone can find rather than a ?lite= parameter only I know about. -->
+        <div class="menu menu--settings" data-menu>
+          <button type="button" class="twitch-link nav-btn nav-btn--icon menu__button"
+                  aria-expanded="false" aria-haspopup="true" aria-controls="menu-display"
+                  aria-label="Display settings" title="Display settings">
+            <span aria-hidden="true">⚙</span>
+          </button>
+          <div class="menu__panel menu__panel--settings" id="menu-display" hidden>
+            <label class="setting" for="perf-toggle">
+              <span class="setting__text">
+                <span class="setting__name">Reduced effects</span>
+                <span class="setting__hint">Drops the frosted glass. Try it if the page feels slow.</span>
+              </span>
+              <input type="checkbox" id="perf-toggle" class="setting__input" role="switch" />
+              <span class="setting__switch" aria-hidden="true"></span>
+            </label>
+            <p class="setting__state" id="perf-state"></p>
+          </div>
+        </div>
       </nav>
     </div>
   </header>

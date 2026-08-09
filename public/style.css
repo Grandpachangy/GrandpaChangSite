@@ -955,9 +955,113 @@ main, .site-header, .site-footer {
   font-size: 0.8em;
 }
 
+/* ---------- Display settings ---------- */
+
+/* Icon-only, so a third control fits the phone header without pushing the
+   pills onto a second row. */
+.nav-btn--icon {
+  padding: 0.4rem 0.62rem;
+  line-height: 1;
+}
+
+/* Wider than the link menus, and text wraps here rather than staying on one
+   line, because this panel explains itself. */
+.menu__panel--settings {
+  min-width: 250px;
+  max-width: min(280px, calc(100vw - 2.5rem));
+  padding: 0.7rem 0.8rem 0.6rem;
+  gap: 0.5rem;
+}
+
+.setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  cursor: pointer;
+}
+
+.setting__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.setting__name {
+  color: var(--moon);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.setting__hint {
+  color: var(--moon-dim);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+/* Kept in the layout rather than display:none so it stays focusable and
+   announces itself; the visible switch below is painted for it. */
+.setting__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.setting__switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin-top: 0.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: rgba(7, 4, 13, 0.7);
+  transition: background 0.22s var(--ease-out), border-color 0.22s var(--ease-out);
+}
+
+.setting__switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--moon-dim);
+  transition: transform 0.22s var(--ease-out), background 0.22s var(--ease-out);
+}
+
+.setting__input:checked + .setting__switch {
+  background: linear-gradient(90deg, var(--violet), var(--magenta));
+  border-color: var(--edge-hi);
+}
+
+.setting__input:checked + .setting__switch::after {
+  transform: translateX(16px);
+  background: var(--moon);
+}
+
+.setting__input:focus-visible + .setting__switch {
+  outline: 2px solid var(--violet-soft);
+  outline-offset: 2px;
+}
+
+.setting__state {
+  margin: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--edge);
+  color: var(--moon-dim);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu__panel { animation: none; }
   .menu__caret { transition: none; }
+  .setting__switch,
+  .setting__switch::after { transition: none; }
 }
 
 main {
@@ -2489,6 +2593,26 @@ html:not(.js) h2::after {
     left: 0;
     right: auto;
     transform-origin: top left;
+  }
+  /* The settings panel is the widest of them and its button sits furthest
+     right, so anchoring to the button's left edge like the others ran it off
+     the screen. Making its wrapper static hands the containing block to the
+     header row instead, so it spans the content gutters and can't overflow
+     whatever the button's position ends up being. */
+  .site-header__inner {
+    position: relative;
+  }
+  .menu--settings {
+    position: static;
+  }
+  /* Pinned to both gutters rather than sized by its content, so it lines up
+     with the column below it at any phone width. */
+  .menu__panel--settings {
+    left: 2rem;
+    right: 2rem;
+    min-width: 0;
+    max-width: none;
+    transform-origin: top right;
   }
   /* 2rem, not 1.25rem: the League tab is fixed flush to the right edge and is
      28px wide at this size, so a narrower gutter let it sit on top of the last
