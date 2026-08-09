@@ -61,6 +61,67 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ============================================================
+   Scrollbar
+
+   The native bar, restyled -- not a scripted replacement. A JS scrollbar has
+   to reimplement drag, click-the-track, keyboard paging, touch and the
+   auto-hiding overlay bars that macOS and mobile use, and it runs code on
+   every scroll event. This costs nothing at runtime and keeps all of that
+   behaviour for free.
+   ============================================================ */
+
+/* Without this the browser assumes a light UI and paints a light grey bar --
+   and light form controls, and a light overscroll gutter -- against a nearly
+   black page. It also gives Firefox and any surface the rules below don't
+   reach a sensible dark default. */
+:root {
+  color-scheme: dark;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(7, 4, 13, 0.55);
+}
+
+/* The border is transparent and the background is clipped to the padding box,
+   which insets the visible thumb without shrinking the area you can grab. */
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  /* Alpha is carried in the stops rather than an opacity property, which the
+     scrollbar pseudo-elements don't reliably honour. */
+  background-image: linear-gradient(180deg, rgba(160, 107, 255, 0.7), rgba(224, 92, 255, 0.7));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-image: linear-gradient(180deg, rgba(200, 165, 255, 0.9), rgba(224, 92, 255, 0.9));
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-image: linear-gradient(180deg, var(--magenta), var(--magenta));
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox has no ::-webkit-scrollbar and uses the standard properties. They're
+   gated behind @supports rather than declared alongside because Chromium gives
+   these precedence over the pseudo-elements whenever both are set, which would
+   throw away the gradient above. */
+@supports not selector(::-webkit-scrollbar) {
+  :root {
+    scrollbar-width: thin;
+    scrollbar-color: var(--violet) rgba(7, 4, 13, 0.55);
+  }
+}
+
 body {
   /* Moonglow in the upper right, falling away to near-black at the foot of
      the page -- the light direction the reference art shares. */
