@@ -155,14 +155,23 @@ body {
   will-change: transform;
 }
 
+/* This used to be three plain gradients under blur(40px), which meant
+   rasterising 2.25 viewports of blur before the first paint -- the single
+   biggest thing standing between a phone and its first frame.
+
+   The blur was not decorative-only: it both dimmed and spread the gradients,
+   so simply deleting it made the wash brighter and turned the lower-left lobe
+   into a visible blob. The stops below are tuned to land where the blurred
+   version did -- lower peak alpha, and a long three-stop falloff doing the
+   spreading that the filter used to do. Checked side by side against the
+   blurred original before it went in. */
 .sky__wash {
   position: absolute;
   inset: -25%;
   background:
-    radial-gradient(closest-side circle at 72% 16%, rgba(200, 166, 255, 0.2), transparent),
-    radial-gradient(closest-side circle at 22% 62%, rgba(160, 107, 255, 0.16), transparent),
-    radial-gradient(closest-side circle at 58% 88%, rgba(224, 92, 255, 0.1), transparent);
-  filter: blur(40px);
+    radial-gradient(closest-side circle at 72% 16%, rgba(200, 166, 255, 0.13), rgba(200, 166, 255, 0.07) 40%, rgba(200, 166, 255, 0.02) 72%, transparent),
+    radial-gradient(closest-side circle at 22% 62%, rgba(160, 107, 255, 0.1), rgba(160, 107, 255, 0.05) 40%, rgba(160, 107, 255, 0.015) 72%, transparent),
+    radial-gradient(closest-side circle at 58% 88%, rgba(224, 92, 255, 0.065), rgba(224, 92, 255, 0.03) 40%, rgba(224, 92, 255, 0.01) 72%, transparent);
   animation: wash-drift 54s ease-in-out infinite alternate;
   will-change: transform;
 }
@@ -200,6 +209,16 @@ body {
 @keyframes swirl {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* The swirl keeps its blur -- it's a conic gradient, so the blur is what turns
+   banded wedges into a haze, unlike the wash above. But 40px against an
+   element that's only 90vw across is proportionally enormous on a phone, and
+   blur cost climbs with radius. Half the radius reads the same at this size. */
+@media (max-width: 640px) {
+  .sky__swirl {
+    filter: blur(20px);
+  }
 }
 
 /* ---------- Stars ---------- */
@@ -2531,12 +2550,15 @@ html:not(.js) h2::after {
 .perf-lite .player-note { background: rgba(10, 6, 22, 0.96); }
 .perf-lite .vod-card__play { background: rgba(10, 6, 22, 0.8); }
 
-/* Both sky layers blur a large area while being animated, which forces a
-   fresh rasterisation of that area every frame in software. They keep
-   moving; they just stop being blurred. Neither leans on the blur for its
-   shape -- the wash is radial gradients, already soft, and the swirl's
-   conic stops interpolate on their own and sit at very low alpha. */
-.perf-lite .sky__wash,
+/* The swirl blurs a large area while being animated, which forces a fresh
+   rasterisation of that area in software. It keeps moving; it just stops
+   being blurred. Its conic stops interpolate on their own and sit at very low
+   alpha, so the banding this exposes is faint -- an acceptable trade in a tier
+   that exists for machines with no GPU at all.
+
+   .sky__wash used to be listed here too. It no longer carries a filter in any
+   tier: its gradients were retuned to produce the diffusion directly, so
+   there's nothing left for this rule to switch off. */
 .perf-lite .sky__swirl {
   filter: none;
 }
