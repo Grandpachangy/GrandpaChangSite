@@ -14,6 +14,7 @@ const {
   ACCOUNTS,
   ACCOUNT_CLUSTER,
   accountKey,
+  regionLabel,
   riotFetch,
   getPuuid,
 } = require("./_riot");
@@ -323,7 +324,7 @@ module.exports = async (req, res) => {
         keyValid: true,
         state: "in-game",
         account: `${account.gameName}#${account.tagLine}`,
-        region: account.platform === "eun1" ? "EUNE" : "EUW",
+        region: regionLabel(account),
         champion: championPayload(idx, me.championId),
         queue: queueLabel(game),
         queueId: game.gameQueueConfigId ?? null,
