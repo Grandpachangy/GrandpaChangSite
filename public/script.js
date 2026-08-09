@@ -532,7 +532,10 @@ syncDockHeight();
 
 // Now playing, via Last.fm. Hidden entirely unless a track is actually
 // playing, so it stays out of the way when there's nothing to show.
-const NOWPLAYING_POLL_MS = 10 * 1000;
+// 20s rather than 10s: a track change showing up half a minute late costs
+// nothing, and this halves both the function calls and the DOM work that
+// every response drags with it. Polling still stops entirely on a hidden tab.
+const NOWPLAYING_POLL_MS = 20 * 1000;
 const nowPlayingEl = document.getElementById("nowplaying");
 const npArt = document.getElementById("np-art");
 const npTitle = document.getElementById("np-title");
@@ -609,7 +612,11 @@ async function checkNowPlaying() {
 // tracked account enters a game; the tab always lets it be toggled either
 // way afterward. The whole widget stays hidden until RIOT_API_KEY is
 // configured, matching the now-playing widget's degrade-quietly pattern.
-const LEAGUE_POLL_MS = 10 * 1000;
+// 15s rather than 10s, and kept tighter than the now-playing poll because this
+// is what notices a game starting or ending. The in-game clock doesn't depend
+// on it -- that runs off its own local tick -- so this only shifts how quickly
+// the card appears and disappears.
+const LEAGUE_POLL_MS = 15 * 1000;
 const leagueWidget = document.getElementById("league-widget");
 const leagueToggle = document.getElementById("league-toggle");
 const leagueCard = document.getElementById("league-card");
@@ -635,7 +642,7 @@ let leagueStopped = false;
 
 // Game clock. The API reports elapsed seconds at fetch time; this ticks it
 // locally between polls so the timer moves every second rather than jumping
-// in 10s steps.
+// a poll's worth at a time.
 let gameClockBaseSec = null;
 let gameClockGameId = null;
 let gameClockSyncedAt = 0;

@@ -45,6 +45,25 @@ npx vercel
 
 Follow the prompts, then add `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` as Environment Variables in the Vercel project dashboard (Settings → Environment Variables) before your first production deploy.
 
+## Asset caching
+
+Vercel serves everything in `public/` with `max-age=0, must-revalidate` by
+default, so every repeat visit revalidates every file before rendering.
+`vercel.json` overrides that, and the split is deliberate (JSON can't carry
+comments, hence this note):
+
+| Files | Policy | Why |
+| --- | --- | --- |
+| `fonts/*` | 1 year, `immutable` | Never edited in place. Changing a face means a new filename. |
+| `.svg .png .ico .webmanifest` | 1 week, then 30 days `stale-while-revalidate` | Generated art and icons. Rarely change, and a stale week is harmless. |
+| `.jpg .jpeg .webp .avif` | 1 day, then 1 week `stale-while-revalidate` | `avatar.jpg` and `og.jpg` are the ones most likely to be swapped, so the staleness window is short. |
+
+`index.html`, `style.css` and `script.js` are deliberately **left revalidating**.
+They aren't content-hashed, so caching them would mean a deploy doesn't reach
+returning visitors until the cache expires — and a stale stylesheet against
+fresh markup renders broken. A 304 on those is cheap; the win here is the
+fonts, the eight branch SVGs and the icons.
+
 ## Notes on ads
 
 Twitch's embedded player doesn't expose a parameter to disable ads — ad insertion is controlled by Twitch's own backend based on your channel's monetization settings, not by embedding sites. There's no supported way for this site to suppress them.
