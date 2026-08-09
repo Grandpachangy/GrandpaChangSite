@@ -27,6 +27,12 @@ const SLOW_FRAME_MS = 24;
 // A frame this long means the tab was hidden or the thread was busy with
 // something unrelated. That is not a measure of how fast the page renders.
 const FRAME_DISCONTINUITY_MS = 250;
+// ~30fps. A frame this late is visible as a hitch rather than as slowness.
+const JANK_FRAME_MS = 32;
+// Held deliberately high. A fifth of frames arriving late is a page that
+// stutters continuously, not one that hiccuped while an iframe attached --
+// and a false positive here costs a capable machine the whole design.
+const JANK_RATIO = 0.2;
 
 const perfParam = new URLSearchParams(location.search).get("lite");
 
@@ -40,6 +46,10 @@ function setPerfLite(on) {
   // settings switch is synced from here rather than only being read once.
   const toggle = document.getElementById("perf-toggle");
   if (toggle) toggle.checked = on;
+  // Switching the tier on stops the scroll handler writing parallax offsets,
+  // which would leave the layers frozen at their last position. Every caller
+  // runs after the page has finished evaluating, so clearParallax exists.
+  if (on) clearParallax();
 }
 
 function storePerfLite(on) {
@@ -140,14 +150,23 @@ function sampleFramePacing() {
     } else {
       deltas.push(dt);
       if (deltas.length >= 70) {
+        // Judged before sorting, because a run of late frames among mostly
+        // healthy ones is stutter you can feel while the median stays clean.
+        // That is what a struggling GPU looks like: the main thread is idle,
+        // most frames are on time, and every few frames one takes far too long.
+        const lateFrames = deltas.filter((d) => d > JANK_FRAME_MS).length;
+        const lateRatio = lateFrames / deltas.length;
+
         deltas.sort((a, b) => a - b);
         const median = deltas[Math.floor(deltas.length / 2)];
 
-        if (median > SLOW_FRAME_MS) {
+        if (median > SLOW_FRAME_MS || lateRatio > JANK_RATIO) {
           setPerfLite(true);
           storePerfLite(true);
           console.info(
-            `Reduced effects: median frame ${median.toFixed(1)}ms. Add ?lite=0 to keep them on.`
+            `Reduced effects: median frame ${median.toFixed(1)}ms, ` +
+              `${Math.round(lateRatio * 100)}% of frames over ${JANK_FRAME_MS}ms. ` +
+              `Add ?lite=0 to keep them on.`
           );
         } else if (!isPerfLite()) {
           // Only recorded when the full-cost page is what was actually
@@ -1108,7 +1127,10 @@ function onScrollFrame() {
 
   if (siteHeader) siteHeader.classList.toggle("is-stuck", y > 8);
 
-  if (!reducedMotion.matches) {
+  // Parallax moves full-viewport layers on every scroll frame, which is the
+  // most expensive thing on the page without a GPU -- and it's the one effect
+  // that only exists while you're scrolling, exactly when the stutter shows.
+  if (!reducedMotion.matches && !isPerfLite()) {
     for (const { el, factor } of parallaxLayers) {
       const offset = Math.max(
         -PARALLAX_LIMIT_PX,
@@ -1117,6 +1139,12 @@ function onScrollFrame() {
       el.style.transform = `translate3d(0, ${offset.toFixed(1)}px, 0)`;
     }
   }
+}
+
+// Whatever offsets the layers were left holding have to be cleared, or they
+// stay frozen wherever the last scroll frame put them.
+function clearParallax() {
+  for (const { el } of parallaxLayers) el.style.transform = "";
 }
 
 function requestScrollFrame() {
@@ -1132,9 +1160,7 @@ onScrollFrame();
 // Drop the parallax offsets if the preference is turned on mid-session,
 // otherwise the layers would freeze wherever they happened to be.
 reducedMotion.addEventListener("change", () => {
-  if (reducedMotion.matches) {
-    for (const { el } of parallaxLayers) el.style.transform = "";
-  }
+  if (reducedMotion.matches) clearParallax();
   requestScrollFrame();
 });
 

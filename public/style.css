@@ -2682,6 +2682,77 @@ html:not(.js) h2::after {
   filter: none;
 }
 
+/* ---- The full-screen motion ----
+
+   This is where the frame budget actually goes. Measured in the opening
+   viewport, 34 elements animate across 7.59 viewports of surface. With a GPU
+   that is nearly free: the layers are textures and each frame is a re-blend.
+   Without one the CPU redraws that surface every frame -- roughly 500
+   megapixels a second at 60fps, several times what a software rasteriser can
+   deliver, which is why it lands in single digits.
+
+   Blur was the wrong thing to have cut first: it accounts for 0.93 viewports
+   against animation's 7.59. Removing it helped first paint, not frame rate.
+
+   So the scene keeps its appearance and stops moving. Small motion survives
+   further down -- presses, hovers, the scroll bar, the now-playing bars --
+   because a few hundred pixels costs nothing even in software. */
+.perf-lite .sky__wash,
+.perf-lite .sky__swirl,
+.perf-lite .stars,
+.perf-lite .moon,
+.perf-lite .moon__corona,
+.perf-lite .clouds,
+.perf-lite .branch__depth,
+.perf-lite .branch__blossoms,
+.perf-lite .hero h1 {
+  animation: none;
+}
+
+/* The ceiling bank carries its flip inside the keyframes, so it needs
+   restating once the animation is off. */
+.perf-lite .clouds--ceiling {
+  transform: scaleY(-1);
+}
+
+/* Pure motion, with nothing to show when still: a petal frozen mid-air and a
+   lightning sheet stuck half-lit both read as broken rather than calm. */
+.perf-lite .petals,
+.perf-lite .flash {
+  display: none;
+}
+
+/* preserve-3d makes the branch a 3D rendering context, which the CPU has to
+   sort and project. Flattened it's an ordinary stack of masked images, drawn
+   once. The masks stay -- they're the branch shapes, and a static mask costs
+   nothing after the first raster. */
+.perf-lite .branch {
+  perspective: none;
+}
+
+.perf-lite .branch__depth {
+  transform-style: flat;
+}
+
+/* will-change buys a GPU texture. With no GPU it buys a CPU-held bitmap and a
+   copy per frame instead, for layers that no longer animate at all. */
+.perf-lite .sky__layer,
+.perf-lite .sky__wash,
+.perf-lite .sky__swirl,
+.perf-lite .stars,
+.perf-lite .moon,
+.perf-lite .clouds,
+.perf-lite .branch__depth,
+.perf-lite .petals i {
+  will-change: auto;
+}
+
+/* A fixed attachment repaints the whole viewport on every scroll step in
+   software -- the single most noticeable stutter while scrolling. */
+.perf-lite body {
+  background-attachment: scroll;
+}
+
 /* ============================================================
    Reduced motion
    Keep the scene and the states, drop the movement.
