@@ -2132,20 +2132,15 @@ html:not(.js) h2::after {
   margin-bottom: 0;
 }
 
+/* The avatar and body stack here, but stay left-aligned. This block used to
+   centre both, which left "About" and its paragraphs centred while "Recent
+   VODs" and "Find me elsewhere" sat hard left directly above and below it --
+   the one place the page broke its own alignment. The heading underline needs
+   no override now either: at left: 0 it lines up like every other section's. */
 @media (max-width: 640px) {
   .about-section {
     grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
     gap: 1.5rem;
-  }
-  .about__body h2::after {
-    left: 50%;
-    transform: translateX(-50%) scaleX(0);
-    transform-origin: 50% 50%;
-  }
-  .reveal.is-visible .about__body h2::after {
-    transform: translateX(-50%) scaleX(1);
   }
 }
 
@@ -2619,15 +2614,6 @@ html:not(.js) h2::after {
   .socials-section h2::after {
     transform: scaleX(1);
     transition: none;
-  }
-
-  /* The About heading centres under 640px, and its underline is centred with
-     a translate. The rule above drops that translate, which parked the bar
-     half a heading to the right until the reveal observer caught up. */
-  @media (max-width: 640px) {
-    .about__body h2::after {
-      transform: translateX(-50%) scaleX(1);
-    }
   }
 
   .league-card,
