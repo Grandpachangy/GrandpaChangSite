@@ -4,35 +4,22 @@ const LIVE_POLL_MS = 60 * 1000;
 const parentHost = window.location.hostname || "localhost";
 
 // ---------------------------------------------------------------------------
-// Performance tier
+// Rendering tier
 //
-// With hardware acceleration off, everything the compositor normally does for
-// free lands on the CPU: backdrop-filter, large animated blurs and the 3D
-// branch context go from cheap to crippling. There is no API that reports
-// whether acceleration is on, so rather than guess at the cause this measures
-// the symptom -- actual frame pacing -- which also catches weak CPUs and
-// battery saver. Falling behind switches the page to `perf-lite`, which drops
-// the expensive effects and keeps the movement.
+// Reduced effects are the default. The full scene animates about seven and a
+// half viewports of surface continuously, which a GPU composites for almost
+// nothing and a CPU cannot: with hardware acceleration off that works out
+// around 500 megapixels a second, several times what a software rasteriser
+// delivers. Rather than try to spot those machines, the cheap tier is simply
+// what everyone gets, and the settings panel turns the full scene on.
+//
+// This replaced a detector that measured frame pacing and the WebGL renderer
+// name. It caught software rasterisers reliably but not merely weak GPUs,
+// where the main thread stays idle and the frames still arrive late. With the
+// safe tier as the default there is nothing left for it to decide.
 // ---------------------------------------------------------------------------
-// A measured verdict, which expires -- a machine's circumstances change.
-const PERF_KEY = "perf:lite";
-// An explicit choice made via ?lite=. Deliberately has no expiry and suppresses
-// measurement entirely, so telling someone "add ?lite=0" actually sticks.
+// An explicit choice, kept forever. Absent means "use the default".
 const PERF_CHOICE_KEY = "perf:choice";
-// Kept in step with the inline tier script in index.html <head>.
-const PERF_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-// ~42fps. Comfortably below 60Hz without tripping on a 120Hz display, where a
-// genuinely smooth frame is 8ms and an occasional 16ms one is still fine.
-const SLOW_FRAME_MS = 24;
-// A frame this long means the tab was hidden or the thread was busy with
-// something unrelated. That is not a measure of how fast the page renders.
-const FRAME_DISCONTINUITY_MS = 250;
-// ~30fps. A frame this late is visible as a hitch rather than as slowness.
-const JANK_FRAME_MS = 32;
-// Held deliberately high. A fifth of frames arriving late is a page that
-// stutters continuously, not one that hiccuped while an iframe attached --
-// and a false positive here costs a capable machine the whole design.
-const JANK_RATIO = 0.2;
 
 const perfParam = new URLSearchParams(location.search).get("lite");
 
@@ -42,22 +29,11 @@ function isPerfLite() {
 
 function setPerfLite(on) {
   document.documentElement.classList.toggle("perf-lite", on);
-  // Measurement can flip the tier a couple of seconds after load, so the
-  // settings switch is synced from here rather than only being read once.
   const toggle = document.getElementById("perf-toggle");
   if (toggle) toggle.checked = on;
   // Switching the tier on stops the scroll handler writing parallax offsets,
-  // which would leave the layers frozen at their last position. Every caller
-  // runs after the page has finished evaluating, so clearParallax exists.
+  // which would leave the layers frozen at their last position.
   if (on) clearParallax();
-}
-
-function storePerfLite(on) {
-  try {
-    localStorage.setItem(PERF_KEY, JSON.stringify({ lite: on, at: Date.now() }));
-  } catch (err) {
-    /* Storage is an optimisation here, not a requirement. */
-  }
 }
 
 function readPerfChoice() {
@@ -68,153 +44,20 @@ function readPerfChoice() {
   }
 }
 
-// The class itself is applied by the inline script in <head>; this only records
-// what future visits should do.
+// The class itself is applied by the inline script in <head>, before anything
+// paints; this only records what future visits should do. ?lite=auto clears the
+// choice, which returns the visitor to the reduced default.
 (function persistPerfChoice() {
   try {
     if (perfParam === "1" || perfParam === "0") {
       localStorage.setItem(PERF_CHOICE_KEY, perfParam);
     } else if (perfParam === "auto") {
       localStorage.removeItem(PERF_CHOICE_KEY);
-      localStorage.removeItem(PERF_KEY);
     }
   } catch (err) {
     /* Without storage the choice simply lasts for this page view. */
   }
 })();
-
-// Direct signal. When acceleration is switched off, Chromium either refuses a
-// WebGL context outright or hands back its software rasteriser, and the name
-// says so. Read locally to pick a rendering tier and never sent anywhere.
-//
-// Returns true for "software", false for "a real GPU", and null when the
-// browser withholds the detail -- Firefox and Safari mask it -- in which case
-// the frame-pacing measurement below is the only thing to go on.
-function detectSoftwareRendering() {
-  let gl = null;
-  try {
-    const canvas = document.createElement("canvas");
-    gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    // Deliberately inconclusive rather than "software". Chromium with
-    // acceleration off still serves WebGL through SwiftShader, so it is caught
-    // by the name test below; a missing context far more often means WebGL is
-    // blocked (Lockdown Mode, Tor, enterprise policy) or the live-context cap
-    // is exhausted, none of which say anything about compositing. Treating it
-    // as proof would downgrade a perfectly fast machine for a week.
-    if (!gl) return null;
-
-    const info = gl.getExtension("WEBGL_debug_renderer_info");
-    const renderer = info
-      ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "")
-      : "";
-    if (!renderer) return null;
-    return /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i.test(
-      renderer
-    );
-  } catch (err) {
-    return null;
-  } finally {
-    // Contexts are a limited resource; this one existed only for its name.
-    if (gl) {
-      const lose = gl.getExtension("WEBGL_lose_context");
-      if (lose) lose.loseContext();
-    }
-  }
-}
-
-function sampleFramePacing() {
-  const deltas = [];
-  let last = performance.now();
-  // Skip the first frames: load, font swap and iframe attach all land there.
-  let warmup = 12;
-  // Bounds the run on a page that never settles enough to produce 70 clean
-  // frames, so this can't schedule itself indefinitely.
-  let attempts = 0;
-
-  function frame(now) {
-    const dt = now - last;
-    last = now;
-    if (++attempts > 600) return;
-
-    // Discard the frame and keep going, rather than abandoning the run. A page
-    // opened in a background tab used to return here and never produce a
-    // verdict at all, which on browsers that mask the renderer name left the
-    // frame sample as the only signal -- and it never fired.
-    if (document.hidden || dt > FRAME_DISCONTINUITY_MS) {
-      requestAnimationFrame(frame);
-      return;
-    }
-
-    if (warmup > 0) {
-      warmup--;
-    } else {
-      deltas.push(dt);
-      if (deltas.length >= 70) {
-        // Judged before sorting, because a run of late frames among mostly
-        // healthy ones is stutter you can feel while the median stays clean.
-        // That is what a struggling GPU looks like: the main thread is idle,
-        // most frames are on time, and every few frames one takes far too long.
-        const lateFrames = deltas.filter((d) => d > JANK_FRAME_MS).length;
-        const lateRatio = lateFrames / deltas.length;
-
-        deltas.sort((a, b) => a - b);
-        const median = deltas[Math.floor(deltas.length / 2)];
-
-        if (median > SLOW_FRAME_MS || lateRatio > JANK_RATIO) {
-          setPerfLite(true);
-          storePerfLite(true);
-          console.info(
-            `Reduced effects: median frame ${median.toFixed(1)}ms, ` +
-              `${Math.round(lateRatio * 100)}% of frames over ${JANK_FRAME_MS}ms. ` +
-              `Add ?lite=0 to keep them on.`
-          );
-        } else if (!isPerfLite()) {
-          // Only recorded when the full-cost page is what was actually
-          // measured. Reading a healthy median off the reduced page says
-          // nothing about how the full one would perform -- acting on it would
-          // switch every effect back on mid-visit, and flip the stored verdict
-          // so the next visit started heavy again.
-          storePerfLite(false);
-        }
-        return;
-      }
-    }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-}
-
-function decidePerfTier() {
-  // An explicit choice wins outright, whether made in this URL or a previous
-  // one. `?lite=auto` clears it and falls through to detection again.
-  if (perfParam === "1" || perfParam === "0") return;
-  if (perfParam !== "auto" && readPerfChoice() !== null) return;
-
-  // Checked before the motion preference, because almost nothing the reduced
-  // tier disables is motion: the backdrop blurs and sky filters cost the same
-  // whether or not anything is animating, and they are the bulk of the work.
-  if (detectSoftwareRendering() === true) {
-    setPerfLite(true);
-    storePerfLite(true);
-    console.info(
-      "Reduced effects: software rendering detected. Add ?lite=0 to keep them on."
-    );
-    return;
-  }
-
-  // With animations switched off there is nothing for frame pacing to measure,
-  // so sampling would only read an idle page.
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-  sampleFramePacing();
-}
-
-// Decide once the page has settled, so start-up work isn't mistaken for jank.
-if (document.readyState === "complete") {
-  setTimeout(decidePerfTier, 900);
-} else {
-  window.addEventListener("load", () => setTimeout(decidePerfTier, 900), { once: true });
-}
 
 // Keeping the live state in the tab title means a pinned or background tab
 // shows it without being switched to.
@@ -1236,21 +1079,19 @@ document.addEventListener("click", (e) => {
 // ---------------------------------------------------------------------------
 // Display settings
 //
-// Automatic detection catches a software rasteriser and a slow main thread,
-// but a weak GPU paired with an idle main thread looks perfectly healthy from
-// JavaScript and slips through. This is the escape hatch for that, and it has
-// to be somewhere a visitor can actually find -- a ?lite= parameter only helps
-// the people who already know to ask.
+// Reduced effects ship on. This is how someone turns the full animated scene
+// back on, and it has to be somewhere they can find -- a ?lite= parameter only
+// helps people who already know to ask.
 // ---------------------------------------------------------------------------
 const perfToggle = document.getElementById("perf-toggle");
 const perfState = document.getElementById("perf-state");
 
 function describePerfState() {
   if (!perfState) return;
+  // Only the state, not the instruction -- the hint above the switch already
+  // says what turning it off does, and repeating it reads as noise.
   perfState.textContent =
-    readPerfChoice() === null
-      ? "Currently set automatically for this device."
-      : "Saved for this browser.";
+    readPerfChoice() === null ? "On by default." : "Saved for this browser.";
 }
 
 if (perfToggle) {
@@ -1261,11 +1102,9 @@ if (perfToggle) {
     const on = perfToggle.checked;
     setPerfLite(on);
     try {
-      // An explicit choice, which the head script prefers over anything
-      // measured and which never expires. Dropping the measured verdict too
-      // stops the two disagreeing if the choice is ever cleared.
+      // Recorded so the inline head script can apply it before the first
+      // paint on the next visit, rather than this one flipping it after.
       localStorage.setItem(PERF_CHOICE_KEY, on ? "1" : "0");
-      localStorage.removeItem(PERF_KEY);
     } catch (err) {
       /* Without storage the choice lasts for this page view only. */
     }

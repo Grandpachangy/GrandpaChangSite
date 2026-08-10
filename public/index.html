@@ -38,29 +38,30 @@
   <!-- Runs before the body parses. Marks that scripting is available, so the
        scroll-reveal states only hide content we can actually reveal again, and
        settles the rendering tier here rather than in script.js at the end of
-       the body -- by then the blurred sky and every backdrop-filter surface
-       have already been laid out and painted once, which on the machines the
-       reduced tier exists for is the single most expensive moment of the load.
-       The 7-day expiry mirrors PERF_TTL_MS in script.js. -->
+       the body -- by then the sky and every backdrop-filter surface have
+       already been laid out and painted once, which is the most expensive
+       moment of the load on exactly the machines this exists for.
+
+       Reduced is the default: the full scene animates roughly seven and a half
+       viewports of surface, which is free on a GPU and impossible without one.
+       Only an explicit choice, made in the settings panel or with ?lite=,
+       turns it off. -->
   <script>
     document.documentElement.className += " js";
+    var lite = true;
     try {
       var p = new URLSearchParams(location.search).get("lite");
-      var lite = p === "1" ? true : p === "0" ? false : null;
-      if (lite === null && p !== "auto") {
+      if (p === "1" || p === "0") {
+        lite = p === "1";
+      } else if (p !== "auto") {
         var choice = localStorage.getItem("perf:choice");
-        if (choice !== null) {
-          lite = choice === "1";
-        } else {
-          var seen = JSON.parse(localStorage.getItem("perf:lite") || "null");
-          if (seen && Date.now() - seen.at < 604800000) lite = !!seen.lite;
-        }
+        if (choice !== null) lite = choice === "1";
       }
-      if (lite) document.documentElement.className += " perf-lite";
     } catch (e) {
-      /* No storage, or a malformed value: fall through to full effects and
-         let script.js measure. */
+      /* No storage, or a malformed value: the reduced default stands, which is
+         the safe way to fail. */
     }
+    if (lite) document.documentElement.className += " perf-lite";
   </script>
 </head>
 <body>
@@ -207,16 +208,20 @@
              detection can't see every slow machine, so it needs a control
              anyone can find rather than a ?lite= parameter only I know about. -->
         <div class="menu menu--settings" data-menu>
-          <button type="button" class="twitch-link nav-btn nav-btn--icon menu__button"
+          <!-- Labelled, not just an icon: this is where someone goes when the
+               page feels wrong, and a bare cog isn't a promise of anything. No
+               aria-label -- the visible text is the accessible name. -->
+          <button type="button" class="twitch-link nav-btn menu__button"
                   aria-expanded="false" aria-haspopup="true" aria-controls="menu-display"
-                  aria-label="Display settings" title="Display settings">
-            <span aria-hidden="true">⚙</span>
+                  title="Display settings">
+            <span class="menu__mark" aria-hidden="true">⚙</span>Settings
+            <span class="menu__caret" aria-hidden="true">▾</span>
           </button>
           <div class="menu__panel menu__panel--settings" id="menu-display" hidden>
             <label class="setting" for="perf-toggle">
               <span class="setting__text">
                 <span class="setting__name">Reduced effects</span>
-                <span class="setting__hint">Drops the frosted glass. Try it if the page feels slow.</span>
+                <span class="setting__hint">Stills the background and drops the blur. Turn off for the full animated scene.</span>
               </span>
               <input type="checkbox" id="perf-toggle" class="setting__input" role="switch" />
               <span class="setting__switch" aria-hidden="true"></span>

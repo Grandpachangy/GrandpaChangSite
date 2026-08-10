@@ -957,13 +957,6 @@ main, .site-header, .site-footer {
 
 /* ---------- Display settings ---------- */
 
-/* Icon-only, so a third control fits the phone header without pushing the
-   pills onto a second row. */
-.nav-btn--icon {
-  padding: 0.4rem 0.62rem;
-  line-height: 1;
-}
-
 /* Wider than the link menus, and text wraps here rather than staying on one
    line, because this panel explains itself. */
 .menu__panel--settings {
