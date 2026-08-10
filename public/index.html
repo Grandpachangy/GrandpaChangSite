@@ -218,15 +218,19 @@
             <span class="menu__caret" aria-hidden="true">▾</span>
           </button>
           <div class="menu__panel menu__panel--settings" id="menu-display" hidden>
-            <label class="setting" for="perf-toggle">
+            <!-- Phrased as the thing you can switch on, not as the reduction
+                 that's already in force. The reduced tier is the default, so a
+                 "Reduced effects" switch would sit here permanently on, asking
+                 to undo something the visitor never chose. -->
+            <label class="setting" for="effects-toggle">
               <span class="setting__text">
-                <span class="setting__name">Reduced effects</span>
-                <span class="setting__hint">Stills the background and drops the blur. Turn off for the full animated scene.</span>
+                <span class="setting__name">Animated background</span>
+                <span class="setting__hint">The drifting sky, falling petals and 3D branches. Off by default because it's heavy on older machines.</span>
               </span>
-              <input type="checkbox" id="perf-toggle" class="setting__input" role="switch" />
+              <input type="checkbox" id="effects-toggle" class="setting__input" role="switch" />
               <span class="setting__switch" aria-hidden="true"></span>
             </label>
-            <p class="setting__state" id="perf-state"></p>
+            <p class="setting__state" id="effects-state"></p>
           </div>
         </div>
       </nav>

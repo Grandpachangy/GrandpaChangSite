@@ -29,8 +29,10 @@ function isPerfLite() {
 
 function setPerfLite(on) {
   document.documentElement.classList.toggle("perf-lite", on);
-  const toggle = document.getElementById("perf-toggle");
-  if (toggle) toggle.checked = on;
+  // The switch is inverted against this flag: it offers the animated
+  // background, which is precisely what the reduced tier takes away.
+  const toggle = document.getElementById("effects-toggle");
+  if (toggle) toggle.checked = !on;
   // Switching the tier on stops the scroll handler writing parallax offsets,
   // which would leave the layers frozen at their last position.
   if (on) clearParallax();
@@ -1079,36 +1081,37 @@ document.addEventListener("click", (e) => {
 // ---------------------------------------------------------------------------
 // Display settings
 //
-// Reduced effects ship on. This is how someone turns the full animated scene
-// back on, and it has to be somewhere they can find -- a ?lite= parameter only
-// helps people who already know to ask.
+// The switch offers the animated background, which is the inverse of the
+// perf-lite flag: checked means full effects, unchecked means the reduced
+// default. Framed this way round because reduced is what everyone already
+// has, so the only action worth offering is switching the scene on.
 // ---------------------------------------------------------------------------
-const perfToggle = document.getElementById("perf-toggle");
-const perfState = document.getElementById("perf-state");
+const effectsToggle = document.getElementById("effects-toggle");
+const effectsState = document.getElementById("effects-state");
 
-function describePerfState() {
-  if (!perfState) return;
-  // Only the state, not the instruction -- the hint above the switch already
-  // says what turning it off does, and repeating it reads as noise.
-  perfState.textContent =
-    readPerfChoice() === null ? "On by default." : "Saved for this browser.";
+function describeEffectsState() {
+  if (!effectsState) return;
+  // Only the state; the hint above the switch already says what it does, and
+  // repeating it reads as noise.
+  effectsState.textContent =
+    readPerfChoice() === null ? "Off by default." : "Saved for this browser.";
 }
 
-if (perfToggle) {
-  perfToggle.checked = isPerfLite();
-  describePerfState();
+if (effectsToggle) {
+  effectsToggle.checked = !isPerfLite();
+  describeEffectsState();
 
-  perfToggle.addEventListener("change", () => {
-    const on = perfToggle.checked;
-    setPerfLite(on);
+  effectsToggle.addEventListener("change", () => {
+    const wantsAnimation = effectsToggle.checked;
+    setPerfLite(!wantsAnimation);
     try {
       // Recorded so the inline head script can apply it before the first
       // paint on the next visit, rather than this one flipping it after.
-      localStorage.setItem(PERF_CHOICE_KEY, on ? "1" : "0");
+      localStorage.setItem(PERF_CHOICE_KEY, wantsAnimation ? "0" : "1");
     } catch (err) {
       /* Without storage the choice lasts for this page view only. */
     }
-    describePerfState();
+    describeEffectsState();
   });
 }
 
