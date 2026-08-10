@@ -263,12 +263,14 @@
                   allowfullscreen
                   scrolling="no"
                 ></iframe>
-                <!-- Double-click-to-fullscreen zones. The iframe is
-                     cross-origin so it swallows its own clicks; these sit above
-                     it, but deliberately leave itzon's Unmute button
-                     (bottom-right) uncovered. -->
+                <!-- Double-click-to-fullscreen zone. The iframe is cross-origin
+                     so it swallows its own clicks; this sits above it, stopping
+                     short of the bottom so the embed's native control bar --
+                     play, volume, fullscreen -- stays reachable. There used to
+                     be a second strip covering that band, carved out only
+                     around itzon's Unmute button; the native controls replace
+                     that button and span the full width, so the strip went. -->
                 <div class="player-dblzone player-dblzone--main"></div>
-                <div class="player-dblzone player-dblzone--strip"></div>
                 <p id="player-note" class="player-note is-hidden" role="status"></p>
               </div>
               <div id="player-placeholder" class="player-placeholder is-hidden">

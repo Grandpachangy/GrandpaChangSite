@@ -256,9 +256,10 @@ function setPoppedOut(poppedOut) {
 popoutToggle.addEventListener("click", () => setPoppedOut(!isPoppedOut));
 popoutRestore.addEventListener("click", () => setPoppedOut(false));
 
-// Fullscreen. itzon's embed exposes no controls of its own (its <video> has
-// no `controls` attribute and the only URL param it reads is `preview`), so
-// the fullscreen request is driven from here against the frame we own.
+// Fullscreen, driven from here against the frame we own. The embed's native
+// controls (see controls=1 in showLivePlayer) carry a fullscreen button of
+// their own now, but it fullscreens the iframe alone -- this one takes the
+// whole player frame, so the pop-out and side-stream buttons come with it.
 const fullscreenToggle = document.getElementById("fullscreen-toggle");
 
 function currentFullscreenEl() {
@@ -372,7 +373,13 @@ const previewMode = new URLSearchParams(location.search).has("preview");
 
 function showLivePlayer() {
   if (isLiveEmbedded) return;
-  livePlayerFrame.src = `https://itzon.tv/embed/${CHANNEL}`;
+  // controls=1 hands the embed over to the browser's native player chrome,
+  // which is the only way to get a volume slider here: the embed exposes no
+  // message API, so nothing on this page can set the volume itself. It also
+  // stands down itzon's own Unmute button, since the native mute control
+  // replaces it. Undocumented in their wiki but declared in their source
+  // (src/embed/modes.ts), so it's a deliberate mode rather than a side effect.
+  livePlayerFrame.src = `https://itzon.tv/embed/${CHANNEL}?controls=1`;
   livePlayerSection.classList.remove("is-hidden");
   offlinePanel.classList.add("is-hidden");
   isLiveEmbedded = true;

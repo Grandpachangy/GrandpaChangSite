@@ -1313,18 +1313,15 @@ main {
   z-index: 2;
 }
 
+/* Stops 64px short of the bottom. The embed now runs with controls=1, so the
+   browser's own control bar sits in that band -- play/pause and the volume
+   slider are at its left end, which the old full-width strip overlay covered
+   completely. Anything overlapping it makes the volume slider unclickable. */
 .player-dblzone--main {
   top: 0;
   left: 0;
   right: 0;
   bottom: 64px;
-}
-
-.player-dblzone--strip {
-  left: 0;
-  right: 156px;
-  bottom: 0;
-  height: 64px;
 }
 
 /* Surfaces a failed fullscreen request, which is otherwise invisible. */
