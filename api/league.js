@@ -19,10 +19,28 @@ const {
   getPuuid,
 } = require("./_riot");
 
-// How long after a match ends to keep showing the result.
-const POSTGAME_WINDOW_MS = 5 * 60 * 1000;
 // How long to keep checking match history after last seeing someone in a game.
+// (There was a POSTGAME_WINDOW_MS here for how long a result stayed on screen.
+// That moved to the client, timed from when it first saw the result, because
+// Match-V5 publishes late and timing from the match's end let that lag eat the
+// window. The constant sat unused afterwards.)
 const POSTGAME_LOOKUP_WINDOW_MS = 12 * 60 * 1000;
+
+// Which account the idle sweep probes for a just-finished match, when neither
+// module state nor the client hint can say who played.
+//
+// The slot comes from the wall clock rather than a counter, because a counter
+// lives in module scope and a recycled instance would restart it at zero --
+// which is the same failure this probe exists to fix. Every instance, warm or
+// cold, derives the same slot, so the rotation advances regardless of who
+// serves the request. Nine accounts at one per slot is a full cycle in a few
+// minutes, well inside the lookup window above.
+const IDLE_PROBE_SLOT_MS = 30 * 1000;
+
+// Match-V5 can filter by start time, so the usual answer -- nobody has played
+// recently -- costs one call instead of two. Generous enough that even an
+// absurdly long game still falls inside it.
+const MATCH_LOOKBACK_MS = 3 * 60 * 60 * 1000;
 
 const QUEUE_NAMES = {
   400: "Normal Draft",
@@ -87,6 +105,11 @@ const STATIC_TTL_MS = 24 * 60 * 60 * 1000;
 function accountFromHint(hint) {
   if (typeof hint !== "string" || !hint || hint.length > 64) return null;
   return ACCOUNTS.find((a) => accountKey(a) === hint) || null;
+}
+
+function idleProbeAccount() {
+  const slot = Math.floor(Date.now() / IDLE_PROBE_SLOT_MS) % ACCOUNTS.length;
+  return ACCOUNTS[slot];
 }
 
 function accountsByPriority() {
@@ -192,9 +215,13 @@ async function getPostGame(account, apiKey) {
   }
 
   const puuid = await getPuuid(account, apiKey);
+  // startTime makes the server do the filtering: an account that hasn't played
+  // in hours comes back as an empty list, and the match-detail call below never
+  // happens. That is what keeps the rotating probe affordable.
+  const startTimeSec = Math.floor((now - MATCH_LOOKBACK_MS) / 1000);
   const idsUrl =
     `https://${ACCOUNT_CLUSTER}.api.riotgames.com/lol/match/v5/matches/by-puuid/` +
-    `${encodeURIComponent(puuid)}/ids?start=0&count=1`;
+    `${encodeURIComponent(puuid)}/ids?start=0&count=1&startTime=${startTimeSec}`;
 
   const idsRes = await riotFetch(idsUrl, apiKey);
   if (!idsRes.ok) {
@@ -394,11 +421,30 @@ module.exports = async (req, res) => {
     // from ACCOUNTS, so it can never reach a Riot URL, and how long a result
     // stays visible is still decided by the match's own end timestamp rather
     // than by anything the client claims.
+    //
+    // Both of those still fail together, and did: module state is gone on a
+    // cold start, and the hint only exists if a browser was open and polling
+    // while the game ran -- which it usually isn't, since the person playing
+    // has the tab hidden and polling stops there. That left the result showing
+    // only when an instance happened to stay warm, which is what made it look
+    // random. So when neither can answer, fall back to probing one account's
+    // match history per slot until the rotation finds whoever played.
     const serverRemembers =
       lastActiveKey && Date.now() - lastActiveSeenAt < POSTGAME_LOOKUP_WINDOW_MS;
-    const account = serverRemembers
-      ? ACCOUNTS.find((a) => `${a.gameName}#${a.tagLine}` === lastActiveKey)
-      : accountFromHint(req.query && req.query.last);
+    const hinted = accountFromHint(req.query && req.query.last);
+
+    let account;
+    let accountSource;
+    if (serverRemembers) {
+      account = ACCOUNTS.find((a) => `${a.gameName}#${a.tagLine}` === lastActiveKey);
+      accountSource = "server-memory";
+    } else if (hinted) {
+      account = hinted;
+      accountSource = "client-hint";
+    } else {
+      account = idleProbeAccount();
+      accountSource = "probe";
+    }
 
     if (account) {
       try {
@@ -425,7 +471,14 @@ module.exports = async (req, res) => {
       lastActiveKey = null;
     }
 
-    res.setHeader("Cache-Control", "s-maxage=15");
+    // 30s, twice the in-game and post-game figure. This is the state the site
+    // sits in almost all the time, so halving how often the function runs here
+    // more than pays for the probe above -- the idle sweep costs about eleven
+    // Riot calls and now runs twice a minute instead of four times. The only
+    // thing it delays is noticing a game has started; the in-game clock is
+    // anchored to elapsed time and ticks locally, so it still reads correctly
+    // the moment the card appears.
+    res.setHeader("Cache-Control", "s-maxage=30");
     const idle = {
       configured: true,
       keyValid: true,
@@ -436,10 +489,12 @@ module.exports = async (req, res) => {
     // Nothing here is sensitive: status codes and timings only, no key.
     if (req.query && req.query.diag) {
       idle.diag = {
-        hintAccepted: account
-          ? `${account.gameName}#${account.tagLine}`
-          : null,
+        // Which of the three routes picked the account matters more than the
+        // account itself when working out why a result didn't appear.
+        lookedUp: account ? `${account.gameName}#${account.tagLine}` : null,
+        accountSource,
         serverRemembers: Boolean(serverRemembers),
+        hintAccepted: Boolean(hinted),
         postGameMiss: lastPostGameMiss,
       };
     }
