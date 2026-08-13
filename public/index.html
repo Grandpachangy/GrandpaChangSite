@@ -204,6 +204,10 @@
           <span class="menu__mark" aria-hidden="true">⚔</span>Accounts
         </button>
 
+        <button type="button" class="twitch-link nav-btn" id="playlists-open" aria-haspopup="dialog">
+          <span class="menu__mark" aria-hidden="true">♪</span>Playlists
+        </button>
+
         <!-- Display settings. The reduced tier is picked automatically, but the
              detection can't see every slow machine, so it needs a control
              anyone can find rather than a ?lite= parameter only I know about. -->
@@ -457,6 +461,36 @@
 
       <p id="accounts-status" class="modal__note is-hidden" role="status"></p>
       <p class="modal__note">Ranked Solo/Duo standing. A live game is flagged as it happens.</p>
+    </div>
+  </div>
+
+  <!-- Playlists. Static markup rather than an API call: these are hand-picked
+       links, and YouTube's playlist metadata needs an API key to read. Adding
+       another is a new <li> here. -->
+  <div id="playlists-modal" class="modal" role="dialog" aria-modal="true"
+       aria-labelledby="playlists-title" hidden>
+    <div class="modal__scrim" data-close></div>
+    <div class="modal__panel" role="document">
+      <header class="modal__head">
+        <h2 class="modal__title" id="playlists-title">Playlists</h2>
+        <button type="button" class="modal__close" data-close aria-label="Close playlists">✕</button>
+      </header>
+
+      <ul class="playlists">
+        <li>
+          <a class="playlist" href="https://www.youtube.com/playlist?list=PLAMuklsYAn8jcHcI2NDDnqwQlycZ1QC73"
+             target="_blank" rel="noopener">
+            <span class="playlist__mark" aria-hidden="true">▶</span>
+            <span class="playlist__text">
+              <span class="playlist__name">Ultra bangers i swear</span>
+              <span class="playlist__meta">YouTube</span>
+            </span>
+            <span class="playlist__ext" aria-hidden="true">↗</span>
+          </a>
+        </li>
+      </ul>
+
+      <p class="modal__note">Opens on YouTube in a new tab.</p>
     </div>
   </div>
 

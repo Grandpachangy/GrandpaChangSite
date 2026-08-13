@@ -1283,14 +1283,23 @@ async function loadAccounts() {
   }
 }
 
-function setAccountsOpen(open) {
-  accountsModal.hidden = !open;
+// ---------------------------------------------------------------------------
+// Dialogs
+//
+// Shared by the accounts and playlists panels, which differ only in what they
+// contain: scroll lock, focus return, close-on-scrim, Escape, and a tab trap
+// so keyboard focus can't wander behind the scrim.
+// ---------------------------------------------------------------------------
+const modals = [];
+
+function setModalOpen(modal, open, onOpen) {
+  modal.hidden = !open;
   document.body.style.overflow = open ? "hidden" : "";
 
   if (open) {
     lastFocusedBeforeModal = document.activeElement;
-    loadAccounts();
-    accountsModal.querySelector(".modal__close").focus();
+    if (onOpen) onOpen();
+    modal.querySelector(".modal__close").focus();
   } else if (lastFocusedBeforeModal) {
     // Return focus where it came from, so keyboard users aren't dumped at the
     // top of the document.
@@ -1299,39 +1308,50 @@ function setAccountsOpen(open) {
   }
 }
 
-accountsOpen.addEventListener("click", () => setAccountsOpen(true));
-accountsModal.addEventListener("click", (e) => {
-  if (e.target.closest("[data-close]")) setAccountsOpen(false);
-});
+function wireModal(modal, trigger, onOpen) {
+  if (!modal || !trigger) return;
+  modals.push(modal);
+
+  trigger.addEventListener("click", () => setModalOpen(modal, true, onOpen));
+  modal.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) setModalOpen(modal, false);
+  });
+
+  modal.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return;
+    const focusable = modal.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
+}
+
+wireModal(accountsModal, accountsOpen, loadAccounts);
+wireModal(
+  document.getElementById("playlists-modal"),
+  document.getElementById("playlists-open")
+);
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!accountsModal.hidden) {
-    setAccountsOpen(false);
+  const openModal = modals.find((m) => !m.hidden);
+  if (openModal) {
+    setModalOpen(openModal, false);
     return;
   }
   if (menus.some((m) => !m.panel.hidden)) {
     const open = menus.find((m) => !m.panel.hidden);
     closeAllMenus();
     open.button.focus();
-  }
-});
-
-// Keeps tabbing inside the dialog while it is open.
-accountsModal.addEventListener("keydown", (e) => {
-  if (e.key !== "Tab") return;
-  const focusable = accountsModal.querySelectorAll(
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-  );
-  if (!focusable.length) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
   }
 });
 
