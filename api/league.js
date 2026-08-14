@@ -33,8 +33,8 @@ const POSTGAME_LOOKUP_WINDOW_MS = 12 * 60 * 1000;
 // lives in module scope and a recycled instance would restart it at zero --
 // which is the same failure this probe exists to fix. Every instance, warm or
 // cold, derives the same slot, so the rotation advances regardless of who
-// serves the request. Nine accounts at one per slot is a full cycle in a few
-// minutes, well inside the lookup window above.
+// serves the request. Nine accounts at two per slot is a full cycle in about
+// two and a half minutes, several times over inside the lookup window above.
 const IDLE_PROBE_SLOT_MS = 30 * 1000;
 
 // Match-V5 can filter by start time, so the usual answer -- nobody has played
@@ -90,10 +90,26 @@ let lastActiveSeenAt = 0;
 // Why the last post-game lookup produced nothing, surfaced via ?diag=1.
 let lastPostGameMiss = null;
 
-let postGameCache = null;
-let postGameCacheKey = null;
-let postGameCachedAt = 0;
+// Post-game lookups, per account. A Map rather than a single slot because the
+// probe below rotates: a one-entry cache is a miss almost every time it is
+// consulted, and each miss is a Riot call. Bounded by ACCOUNTS.
+//
+// `result: null` is cached like any other answer. "This account has nothing to
+// show" is a real finding, and it is the answer for eight accounts out of nine
+// on every sweep -- not storing it meant the same two calls were spent to learn
+// the same thing every time the rotation came back around.
+const postGameCache = new Map(); // key -> { at, result }
 const POSTGAME_CACHE_MS = 45 * 1000;
+
+function readPostGameCache(key, now) {
+  const entry = postGameCache.get(key);
+  if (!entry || now - entry.at >= POSTGAME_CACHE_MS) return undefined;
+  return entry.result;
+}
+
+function writePostGameCache(key, now, result) {
+  postGameCache.set(key, { at: now, result });
+}
 
 let staticCache = null;
 let staticCachedAt = 0;
@@ -107,9 +123,20 @@ function accountFromHint(hint) {
   return ACCOUNTS.find((a) => accountKey(a) === hint) || null;
 }
 
-function idleProbeAccount() {
-  const slot = Math.floor(Date.now() / IDLE_PROBE_SLOT_MS) % ACCOUNTS.length;
-  return ACCOUNTS[slot];
+// Two accounts, overlapping with the previous slot's pair. The function only
+// runs when the edge cache expires and a request happens to arrive, so slots
+// pass whether or not anyone probed during them -- with one account per slot,
+// a few seconds of jitter was enough to step over a slot entirely and leave
+// that account unchecked for a whole rotation. An overlapping window absorbs a
+// skipped slot: slot k covers {k, k+1}, slot k+2 covers {k+2, k+3}, so nothing
+// falls between them. The overlap costs nothing, because the account it repeats
+// was cached by the previous slot well inside POSTGAME_CACHE_MS.
+function idleProbeAccounts() {
+  const slot = Math.floor(Date.now() / IDLE_PROBE_SLOT_MS);
+  return [
+    ACCOUNTS[slot % ACCOUNTS.length],
+    ACCOUNTS[(slot + 1) % ACCOUNTS.length],
+  ];
 }
 
 function accountsByPriority() {
@@ -203,16 +230,12 @@ async function getActiveGame(account, apiKey) {
 // Most recent finished match, if it ended inside the post-game window.
 async function getPostGame(account, apiKey) {
   const now = Date.now();
-  const cacheKey = `${account.gameName}#${account.tagLine}`;
-  // Keyed by account: with the hint in play a request can now ask about a
-  // different account than the one that filled the cache.
-  if (
-    postGameCache &&
-    postGameCacheKey === cacheKey &&
-    now - postGameCachedAt < POSTGAME_CACHE_MS
-  ) {
-    return postGameCache;
-  }
+  const cacheKey = accountKey(account);
+  // Keyed by account: with the hint and the probe in play, consecutive requests
+  // routinely ask about different accounts. `undefined` means no entry; a
+  // cached `null` is a hit and returns immediately.
+  const cached = readPostGameCache(cacheKey, now);
+  if (cached !== undefined) return cached;
 
   const puuid = await getPuuid(account, apiKey);
   // startTime makes the server do the filtering: an account that hasn't played
@@ -231,6 +254,10 @@ async function getPostGame(account, apiKey) {
   const ids = await idsRes.json();
   if (!Array.isArray(ids) || !ids.length) {
     lastPostGameMiss = "no matches returned";
+    // The overwhelmingly common answer, and a definitive one -- cached so the
+    // rotation stops re-asking. Worst case it delays noticing a finished game
+    // by POSTGAME_CACHE_MS, which is seconds against a twelve-minute window.
+    writePostGameCache(cacheKey, now, null);
     return null;
   }
 
@@ -257,9 +284,7 @@ async function getPostGame(account, apiKey) {
           (now - endedAt) / 1000
         )}s ago`
       : "no gameEndTimestamp";
-    postGameCache = null;
-    postGameCacheKey = cacheKey;
-    postGameCachedAt = now;
+    writePostGameCache(cacheKey, now, null);
     return null;
   }
 
@@ -272,7 +297,7 @@ async function getPostGame(account, apiKey) {
 
   const idx = await getStaticIndex();
   const result = {
-    account: `${account.gameName}#${account.tagLine}`,
+    account: accountKey(account),
     champion: championPayload(idx, me.championId),
     win: Boolean(me.win),
     kills: me.kills ?? 0,
@@ -284,9 +309,7 @@ async function getPostGame(account, apiKey) {
     endedAt,
   };
 
-  postGameCache = result;
-  postGameCacheKey = cacheKey;
-  postGameCachedAt = now;
+  writePostGameCache(cacheKey, now, result);
   return result;
 }
 
@@ -315,7 +338,7 @@ module.exports = async (req, res) => {
         failures++;
         // A failure on the account that was last seen playing is the one that
         // matters: the others returning "not in a game" says nothing about it.
-        if (`${account.gameName}#${account.tagLine}` === lastActiveKey) {
+        if (accountKey(account) === lastActiveKey) {
           activeAccountFailed = true;
         }
         console.error("league: account check failed:", err.message);
@@ -325,10 +348,12 @@ module.exports = async (req, res) => {
 
       const { game, me } = result;
       const idx = await getStaticIndex();
-      lastActiveKey = `${account.gameName}#${account.tagLine}`;
+      lastActiveKey = accountKey(account);
       lastActiveSeenAt = Date.now();
-      // A new game invalidates any cached post-game result.
-      postGameCache = null;
+      // A new game invalidates this account's cached post-game result, and only
+      // this one. Clearing the whole cache threw away another account's
+      // just-finished match because someone unrelated started playing.
+      postGameCache.delete(lastActiveKey);
 
       // Both full line-ups. Spectator-V5 carries no lane or role field, so
       // any per-lane pairing would be inference dressed up as fact -- the
@@ -427,35 +452,51 @@ module.exports = async (req, res) => {
     // while the game ran -- which it usually isn't, since the person playing
     // has the tab hidden and polling stops there. That left the result showing
     // only when an instance happened to stay warm, which is what made it look
-    // random. So when neither can answer, fall back to probing one account's
-    // match history per slot until the rotation finds whoever played.
+    // random. So when neither can answer, fall back to probing accounts'
+    // match history by rotation until it finds whoever played.
     const serverRemembers =
       lastActiveKey && Date.now() - lastActiveSeenAt < POSTGAME_LOOKUP_WINDOW_MS;
     const hinted = accountFromHint(req.query && req.query.last);
 
-    let account;
+    let candidates;
     let accountSource;
     if (serverRemembers) {
-      account = ACCOUNTS.find((a) => `${a.gameName}#${a.tagLine}` === lastActiveKey);
+      const remembered = ACCOUNTS.find((a) => accountKey(a) === lastActiveKey);
+      candidates = remembered ? [remembered] : [];
       accountSource = "server-memory";
     } else if (hinted) {
-      account = hinted;
+      candidates = [hinted];
       accountSource = "client-hint";
     } else {
-      account = idleProbeAccount();
+      candidates = idleProbeAccounts();
       accountSource = "probe";
     }
 
-    if (account) {
+    for (const account of candidates) {
       try {
         const post = await getPostGame(account, apiKey);
         if (post) {
+          // Pin the account the result came from. Without this the next
+          // request rotated to a different one, found nothing, and answered
+          // idle -- so the card appeared for a single slot and then vanished
+          // until the rotation came back around, which read as the card
+          // flickering rather than as the result being found.
+          //
+          // Anchored to the match's own end, not to now: refreshing the
+          // timestamp on every hit would keep this account pinned for a full
+          // window after it stopped being relevant, and the probe -- which is
+          // how anyone else's finished game gets noticed -- would be suppressed
+          // that whole time. Anchoring means the pin expires exactly when the
+          // result does.
+          lastActiveKey = accountKey(account);
+          lastActiveSeenAt = post.endedAt;
+
           res.setHeader("Cache-Control", "s-maxage=15");
           res.status(200).json({
             configured: true,
             keyValid: true,
             state: "post-game",
-            account: `${account.gameName}#${account.tagLine}`,
+            account: accountKey(account),
             ...post,
           });
           return;
@@ -489,9 +530,9 @@ module.exports = async (req, res) => {
     // Nothing here is sensitive: status codes and timings only, no key.
     if (req.query && req.query.diag) {
       idle.diag = {
-        // Which of the three routes picked the account matters more than the
-        // account itself when working out why a result didn't appear.
-        lookedUp: account ? `${account.gameName}#${account.tagLine}` : null,
+        // Which of the three routes picked the accounts matters more than the
+        // accounts themselves when working out why a result didn't appear.
+        lookedUp: candidates.map(accountKey),
         accountSource,
         serverRemembers: Boolean(serverRemembers),
         hintAccepted: Boolean(hinted),

@@ -756,6 +756,17 @@ async function checkLeague() {
       if (Date.now() - postGameSeenAt > POSTGAME_DISPLAY_MS) {
         effectiveState = "idle";
         writeLeagueHint(null);
+      } else if (data.account) {
+        // Keep naming this account while the result is on screen. A page that
+        // arrives after the game has already ended never sees the in-game
+        // state, so without this it never records a hint -- and the server,
+        // asked with no hint, rotates its probe onto some other account and
+        // answers idle, taking the card away a poll after showing it.
+        //
+        // Written here rather than beside the in-game hint above so it stops
+        // exactly when the card does: past the display window the branch above
+        // clears it instead, and the two can't fight over it.
+        writeLeagueHint(data.account);
       }
     } else if (state === "in-game") {
       postGameSeenKey = null;
