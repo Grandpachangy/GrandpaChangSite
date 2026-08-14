@@ -33,8 +33,8 @@ const POSTGAME_LOOKUP_WINDOW_MS = 12 * 60 * 1000;
 // lives in module scope and a recycled instance would restart it at zero --
 // which is the same failure this probe exists to fix. Every instance, warm or
 // cold, derives the same slot, so the rotation advances regardless of who
-// serves the request. Nine accounts at two per slot is a full cycle in about
-// two and a half minutes, several times over inside the lookup window above.
+// serves the request. The list at two per slot is a full cycle in a couple of
+// minutes, several times over inside the lookup window above.
 const IDLE_PROBE_SLOT_MS = 30 * 1000;
 
 // Match-V5 can filter by start time, so the usual answer -- nobody has played
@@ -95,8 +95,8 @@ let lastPostGameMiss = null;
 // consulted, and each miss is a Riot call. Bounded by ACCOUNTS.
 //
 // `result: null` is cached like any other answer. "This account has nothing to
-// show" is a real finding, and it is the answer for eight accounts out of nine
-// on every sweep -- not storing it meant the same two calls were spent to learn
+// show" is a real finding, and it is the answer for all but one account on
+// every sweep -- not storing it meant the same two calls were spent to learn
 // the same thing every time the rotation came back around.
 const postGameCache = new Map(); // key -> { at, result }
 const POSTGAME_CACHE_MS = 45 * 1000;
@@ -514,8 +514,9 @@ module.exports = async (req, res) => {
 
     // 30s, twice the in-game and post-game figure. This is the state the site
     // sits in almost all the time, so halving how often the function runs here
-    // more than pays for the probe above -- the idle sweep costs about eleven
-    // Riot calls and now runs twice a minute instead of four times. The only
+    // more than pays for the probe above -- the idle sweep costs one call per
+    // account plus one probe, and now runs twice a minute instead of four
+    // times, against a budget of roughly fifty a minute. The only
     // thing it delays is noticing a game has started; the in-game clock is
     // anchored to elapsed time and ticks locally, so it still reads correctly
     // the moment the card appears.

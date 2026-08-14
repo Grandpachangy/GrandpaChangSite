@@ -11,11 +11,11 @@ const ACCOUNTS = [
   { gameName: "exoispatrick", tagLine: "bottl", platform: "euw1" },
   { gameName: "vita nihil", tagLine: "blank", platform: "euw1" },
   { gameName: "ere", tagLine: "mrm", platform: "euw1" },
-  { gameName: "LockedUpOsrs", tagLine: "TR1", platform: "tr1" },
 ];
 
-// EUW, EUNE and TR all route through the europe cluster for
-// Account-V1/Match-V5. Only the platform host below differs per server.
+// EUW and EUNE both route through the europe cluster for Account-V1/Match-V5,
+// as do TR, RU and ME if an account on one is ever added back. Only the
+// platform host on each account above differs per server.
 const ACCOUNT_CLUSTER = "europe";
 
 const puuidCache = new Map();
@@ -28,6 +28,10 @@ function accountKey(account) {
 // the id in caps, so a new server shows something honest rather than being
 // silently mislabelled as one of these -- which is what the old
 // "eun1 ? EUNE : EUW" check did to the first non-EU account added.
+//
+// Deliberately wider than ACCOUNTS: the entries with nobody on them cost
+// nothing and mean adding an account on one of those servers is a one-line
+// change here, not a bug report about the wrong region on a card.
 const REGION_LABELS = {
   euw1: "EUW",
   eun1: "EUNE",
