@@ -18,10 +18,34 @@
 // A now-playing claim with hours of silence behind it is therefore a scrobbler
 // that went away, not music that is still going.
 //
-// Two hours is deliberately generous -- longer than any single track anyone
-// would queue -- because wrongly hiding real music is worse than being slow to
-// notice it stopped.
-const NOWPLAYING_TRUST_MS = 2 * 60 * 60 * 1000;
+// The age of the last scrobble is not enough on its own, which the first
+// version of this got wrong. Put music on after a few hours away and the new
+// track is genuinely playing while the newest scrobble is still hours old --
+// Last.fm does not record the new one for about four minutes -- so judging by
+// that age alone suppressed real music for exactly as long as it took to
+// prove itself. Resuming after a break and never having stopped look identical
+// from the scrobble history.
+//
+// What tells them apart is whether the entry is the same one. A stuck entry
+// never changes; someone putting music on changes it immediately. So the entry
+// is only doubted once it has sat there unchanged AND nothing has scrobbled
+// behind it for that whole time.
+//
+// Three hours, because a single long track is genuinely indistinguishable from
+// a stuck one. Last.fm records a track once, minutes in, and then nothing more
+// until it ends -- so an hour into a two-hour set the history looks exactly
+// like an entry nobody is updating. There is no signal in this API that
+// separates them. The window is therefore set past any plausible single track
+// rather than at the point of suspicion: being slow to notice music stopped is
+// a small wrong, and hiding music that is playing is a bigger one.
+const NOWPLAYING_TRUST_MS = 3 * 60 * 60 * 1000;
+
+// The entry currently being watched, and when it first appeared. Module scope,
+// so a recycled instance forgets and gives a stuck entry the benefit of the
+// doubt again -- which is the right way for this to fail, and costs nothing
+// while anyone is on the page, since it is polled every few seconds.
+let seenKey = null;
+let seenAt = 0;
 
 module.exports = async (req, res) => {
   const user = process.env.LASTFM_USER;
@@ -70,12 +94,23 @@ module.exports = async (req, res) => {
       ? Date.now() - Number(lastScrobble.date.uts) * 1000
       : null;
 
-    // Believed unless the silence behind it says otherwise. With no scrobble
-    // history at all there is nothing to weigh it against, so it stands.
+    // Track identity, so a changed entry resets the clock.
+    const key = nowPlaying
+      ? `${(nowPlaying.artist && nowPlaying.artist["#text"]) || ""} - ${nowPlaying.name || ""}`
+      : null;
+    if (key && key !== seenKey) {
+      seenKey = key;
+      seenAt = Date.now();
+    }
+    const heldForMs = key ? Date.now() - seenAt : 0;
+
+    // Both conditions, not either. Unchanged for the whole window says the
+    // scrobbler is not updating it; silence behind it says the scrobbler is not
+    // recording anything either. One without the other is ordinary listening.
     const stale =
       Boolean(nowPlaying) &&
-      scrobbleAgeMs !== null &&
-      scrobbleAgeMs > NOWPLAYING_TRUST_MS;
+      heldForMs > NOWPLAYING_TRUST_MS &&
+      (scrobbleAgeMs === null || scrobbleAgeMs > NOWPLAYING_TRUST_MS);
 
     const track = stale ? lastScrobble : nowPlaying || lastScrobble || null;
 
@@ -86,6 +121,10 @@ module.exports = async (req, res) => {
         diag: {
           tracks: tracks.length,
           hasNowPlaying: Boolean(nowPlaying),
+          // How long this exact entry has been sat there. Resets when the
+          // track changes, which is what separates a stuck entry from someone
+          // putting music on after a long break.
+          heldForSec: Math.round(heldForMs / 1000),
           lastScrobbleAgeSec:
             scrobbleAgeMs === null ? null : Math.round(scrobbleAgeMs / 1000),
           trustWindowSec: NOWPLAYING_TRUST_MS / 1000,
