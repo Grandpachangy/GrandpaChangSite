@@ -27,6 +27,39 @@ const FAILED_CACHE_MS = 45 * 1000;
 let cache = null;
 let cachedAt = 0;
 let cacheTtl = CACHE_MS;
+// Kept beside the cache rather than inside it, so ?diag=1 can be answered from
+// a cached sweep too. Storing it in the payload meant diagnostics depended on
+// which request happened to fill the cache: an ordinary request cached a
+// payload with no diag and the next ?diag=1 got nothing back, while a diag
+// request cached one that carried the failure map to every visitor after it.
+let lastFailures = {};
+
+// How many accounts are in flight at once.
+//
+// Not all of them: firing the whole list at one platform host is what let a
+// single rate-limit window fail every account together. Not one at a time
+// either -- that was the first fix here, and it multiplied worst-case wall
+// time by the length of the list, which on a cold instance with the fallback
+// path in play is enough serial round trips to risk the function's own time
+// limit. Three keeps the burst far inside Riot's per-region allowance while
+// bounding the sweep to a few rounds.
+const SWEEP_CONCURRENCY = 3;
+
+// Ordered, bounded parallelism. Results land at their original index so the
+// payload keeps the configured account order regardless of who finishes first.
+async function mapWithLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    for (let i = next++; i < items.length; i = next++) {
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker)
+  );
+  return results;
+}
 
 // Last rank each account reported successfully, so a failed refresh can show a
 // slightly old number instead of nothing. Per instance and lost on recycle,
@@ -106,25 +139,25 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Diagnostics are attached per request, never stored, so asking for them is
+  // what decides whether they appear.
+  const wantsDiag = Boolean(req.query && req.query.diag);
+  const send = (payload, failures) =>
+    res
+      .status(200)
+      .json(wantsDiag ? { ...payload, diag: { failures } } : payload);
+
   const now = Date.now();
   if (cache && now - cachedAt < cacheTtl) {
     res.setHeader("Cache-Control", `s-maxage=${Math.round(cacheTtl / 1000)}`);
-    res.status(200).json(cache);
+    send(cache, lastFailures);
     return;
   }
 
   try {
-    const accounts = [];
     const failures = {};
 
-    // Sequential, not Promise.all. Every account but one is on the same
-    // platform host, and Riot's budget is per-region, so firing the whole list
-    // at once put the entire sweep inside a single rate-limit window -- when it
-    // tripped, it tripped for all of them together, which is exactly the
-    // all-or-nothing failure this panel showed. Spread out, a limit costs the
-    // accounts still waiting rather than every account at once. The result is
-    // cached for ten minutes, so nobody is waiting on the extra second.
-    for (const account of ACCOUNTS) {
+    const accounts = await mapWithLimit(ACCOUNTS, SWEEP_CONCURRENCY, async (account) => {
       const base = {
         name: account.gameName,
         tag: account.tagLine,
@@ -140,7 +173,7 @@ module.exports = async (req, res) => {
           flex: queuePayload(list.find((e) => e.queueType === FLEX)),
         };
         lastGood.set(base.key, ranks);
-        accounts.push({ ...base, ...ranks });
+        return { ...base, ...ranks };
       } catch (err) {
         // One account failing must not blank the whole panel.
         console.error(`accounts: ${base.key} failed:`, err.message);
@@ -150,22 +183,20 @@ module.exports = async (req, res) => {
         // A rank that is a few minutes old is a far better answer than none,
         // and `stale` says plainly which it is.
         const known = lastGood.get(base.key);
-        accounts.push(
-          known
-            ? { ...base, ...known, stale: true }
-            : { ...base, solo: null, flex: null, unavailable: true }
-        );
+        return known
+          ? { ...base, ...known, stale: true }
+          : { ...base, solo: null, flex: null, unavailable: true };
       }
-    }
+    });
 
     const degraded = Object.keys(failures).length > 0;
 
     const payload = { configured: true, accounts };
     if (degraded) payload.degraded = true;
-    if (req.query && req.query.diag) payload.diag = { failures };
 
     cache = payload;
     cachedAt = now;
+    lastFailures = failures;
     // A degraded sweep is worth retrying in under a minute; a clean one is not.
     cacheTtl = degraded ? FAILED_CACHE_MS : CACHE_MS;
 
@@ -175,7 +206,7 @@ module.exports = async (req, res) => {
         ? `s-maxage=${FAILED_CACHE_MS / 1000}`
         : "s-maxage=600, stale-while-revalidate=1800"
     );
-    res.status(200).json(payload);
+    send(payload, failures);
   } catch (err) {
     console.error("accounts endpoint failed:", err);
     res.status(500).json({ error: "Unable to fetch accounts" });

@@ -416,11 +416,9 @@ function syncDockHeight() {
 window.addEventListener("resize", syncDockHeight);
 syncDockHeight();
 
-// Now playing, via Last.fm. Hidden entirely unless a track is actually
-// playing, so it stays out of the way when there's nothing to show.
-// 20s rather than 10s: a track change showing up half a minute late costs
-// nothing, and this halves both the function calls and the DOM work that
-// every response drags with it. Polling still stops entirely on a hidden tab.
+// Now playing, via Last.fm. Falls back to the last scrobble when nothing is
+// playing, and hides only when there is nothing to show at all.
+//
 // 10s. The endpoint caches for 5s at the edge, so the track can be up to about
 // 15s behind rather than 25s. This is a Last.fm call, not a Riot one -- it has
 // nothing to do with the rate budget that made the other intervals worth

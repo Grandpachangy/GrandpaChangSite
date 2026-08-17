@@ -98,7 +98,14 @@ module.exports = async (req, res) => {
     const key = nowPlaying
       ? `${(nowPlaying.artist && nowPlaying.artist["#text"]) || ""} - ${nowPlaying.name || ""}`
       : null;
-    if (key && key !== seenKey) {
+    if (!key) {
+      // Nothing to watch. The last entry has to be forgotten here, or its clock
+      // keeps running while nothing is playing at all -- and putting that same
+      // track on again hours later would then look like it had been sat there
+      // the whole time, which is the one thing this is meant not to do.
+      seenKey = null;
+      seenAt = 0;
+    } else if (key !== seenKey) {
       seenKey = key;
       seenAt = Date.now();
     }
@@ -107,10 +114,16 @@ module.exports = async (req, res) => {
     // Both conditions, not either. Unchanged for the whole window says the
     // scrobbler is not updating it; silence behind it says the scrobbler is not
     // recording anything either. One without the other is ordinary listening.
+    //
+    // A missing scrobble age is not silence -- it is no history to judge
+    // against, which is a reason to leave the entry alone rather than to doubt
+    // it. Counting it as evidence also removed the only thing there was to fall
+    // back to, so the widget vanished outright instead of showing anything.
     const stale =
       Boolean(nowPlaying) &&
       heldForMs > NOWPLAYING_TRUST_MS &&
-      (scrobbleAgeMs === null || scrobbleAgeMs > NOWPLAYING_TRUST_MS);
+      scrobbleAgeMs !== null &&
+      scrobbleAgeMs > NOWPLAYING_TRUST_MS;
 
     const track = stale ? lastScrobble : nowPlaying || lastScrobble || null;
 
