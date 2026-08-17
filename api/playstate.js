@@ -15,6 +15,21 @@ function clean(value) {
 module.exports = async (req, res) => {
   const secret = process.env.PLAYSTATE_TOKEN;
 
+  // Open to any origin on purpose. The secret is the security boundary here,
+  // not the origin: this accepts no cookies and no session, so a request
+  // without the token is worthless whoever sends it. Being origin-locked
+  // instead would buy nothing and would break the moment the browser posts
+  // from a page other than the one guessed at.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "content-type, x-playstate-token");
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
   // No secret, no endpoint. Deliberately not "accept anything when unset":
   // an open write endpoint would let anyone on the internet decide whether the
   // site says music is playing.
@@ -34,7 +49,18 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const offered = req.headers["x-playstate-token"];
+  let body = {};
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+  } catch (err) {
+    res.status(400).json({ error: "Bad request" });
+    return;
+  }
+
+  // Header or body. The body form lets the sender use a text/plain POST, which
+  // the browser treats as a simple request and sends without a preflight --
+  // one fewer round trip for an extension or a blocker to interfere with.
+  const offered = req.headers["x-playstate-token"] || body.token;
   if (typeof offered !== "string" || offered !== secret) {
     // No detail: a wrong token and a malformed one should look identical.
     res.status(401).json({ error: "Unauthorized" });
@@ -42,9 +68,6 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const body =
-      typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
-
     // Only these two. "playing" is recorded but currently acts on nothing --
     // see the note in nowplaying.js about why the signal is allowed to switch
     // the card off and never on.
