@@ -3,116 +3,6 @@
 // YouTube Music (via a scrobbler extension) through one endpoint.
 // Reading public scrobbles needs only an API key -- no OAuth.
 
-// How long a "now playing" entry is believed once nothing new has been
-// scrobbled behind it.
-//
-// Last.fm holds a now-playing entry until a scrobbler replaces it. Close the
-// player mid-track and that replacement never comes, so the entry sits there
-// indefinitely -- which is why the card read "Now playing" for hours after the
-// music stopped. The entry carries no timestamp, so it cannot say how old it
-// is on its own.
-//
-// The history behind it can. A scrobbler that is alive keeps scrobbling: Last.fm
-// records a track once it has played for four minutes or half its length,
-// whichever comes first, so even an hour-long mix lands a scrobble minutes in.
-// A now-playing claim with hours of silence behind it is therefore a scrobbler
-// that went away, not music that is still going.
-//
-// The age of the last scrobble is not enough on its own, which the first
-// version of this got wrong. Put music on after a few hours away and the new
-// track is genuinely playing while the newest scrobble is still hours old --
-// Last.fm does not record the new one for about four minutes -- so judging by
-// that age alone suppressed real music for exactly as long as it took to
-// prove itself. Resuming after a break and never having stopped look identical
-// from the scrobble history.
-//
-// What tells them apart is whether the entry is the same one. A stuck entry
-// never changes; someone putting music on changes it immediately. So the entry
-// is only doubted once it has sat there unchanged AND nothing has scrobbled
-// behind it for that whole time.
-//
-// How long to expect it to last is the track's own length, which track.getInfo
-// knows. A song cannot play for longer than it runs, so once an entry has sat
-// there past its own duration it is not playing, whatever the flag says. That
-// is a fact about the track rather than a guess about the scrobbler, and it is
-// what replaced a flat three-hour window: three hours was chosen to protect
-// long mixes, but it made pausing a four-minute song look like playing it for
-// an afternoon.
-const DURATION_SLACK_MS = 5 * 60 * 1000;
-
-// Last.fm often has no length on file -- uploads, mixes, anything obscure --
-// and this account's tracks are all of that kind, so the fallback is the path
-// that actually runs rather than a corner case.
-//
-// The gap between the two most recent scrobbles stands in for a length. It is
-// how long the track before this one really ran, measured rather than assumed,
-// and it comes out of the response already being fetched. Someone playing
-// three-minute songs and someone playing hour-long sets want very different
-// windows, and this is the difference between them stated in their own data.
-//
-// Clamped at both ends: a floor so a run of very short tracks cannot make the
-// window twitchy, and a ceiling so a gap that is really a break -- stopped at
-// midnight, started again at noon -- cannot stretch it to something useless.
-const OBSERVED_GAP_FLOOR_MS = 10 * 60 * 1000;
-const OBSERVED_GAP_CEILING_MS = 90 * 60 * 1000;
-
-// Only when there is not even a second scrobble to measure against.
-const UNKNOWN_DURATION_WINDOW_MS = 30 * 60 * 1000;
-
-// How long the previous track ran, from the timestamps we already have.
-function observedGapMs(tracks) {
-  const dated = tracks
-    .filter((t) => t.date && t.date.uts)
-    .map((t) => Number(t.date.uts) * 1000)
-    .filter((n) => Number.isFinite(n))
-    .sort((a, b) => b - a);
-  if (dated.length < 2) return null;
-  return dated[0] - dated[1];
-}
-
-// The entry currently being watched, and when it first appeared. Module scope,
-// so a recycled instance forgets and gives a stuck entry the benefit of the
-// doubt again -- which is the right way for this to fail, and costs nothing
-// while anyone is on the page, since it is polled every few seconds.
-let seenKey = null;
-let seenAt = 0;
-
-// Track lengths, keyed the same way. A length never changes, so this is asked
-// once per track rather than once per poll.
-const durationCache = new Map();
-
-// Last.fm reports duration in milliseconds, as a string, and "0" for "no idea".
-// A failure here is not worth failing the whole widget over -- it just means
-// falling back to the window above.
-async function trackDurationMs(track, apiKey) {
-  const artist = (track.artist && track.artist["#text"]) || "";
-  const name = track.name || "";
-  const key = `${artist} - ${name}`;
-  if (durationCache.has(key)) return durationCache.get(key);
-
-  let ms = 0;
-  try {
-    const url =
-      "https://ws.audioscrobbler.com/2.0/?method=track.getInfo" +
-      `&api_key=${encodeURIComponent(apiKey)}` +
-      `&artist=${encodeURIComponent(artist)}` +
-      `&track=${encodeURIComponent(name)}` +
-      "&format=json&autocorrect=0";
-    const res = await fetch(url);
-    if (res.ok) {
-      const body = await res.json();
-      const raw = body && body.track && body.track.duration;
-      const parsed = Number(raw);
-      if (Number.isFinite(parsed) && parsed > 0) ms = parsed;
-    }
-  } catch (err) {
-    console.error("nowplaying: duration lookup failed:", err.message);
-  }
-
-  durationCache.set(key, ms);
-  return ms;
-}
-
 module.exports = async (req, res) => {
   const user = process.env.LASTFM_USER;
   const apiKey = process.env.LASTFM_API_KEY;
@@ -131,11 +21,7 @@ module.exports = async (req, res) => {
       "?method=user.getrecenttracks" +
       `&user=${encodeURIComponent(user)}` +
       `&api_key=${encodeURIComponent(apiKey)}` +
-      // Three, not one. A now-playing entry occupies the first slot, so asking
-      // for a single track hid the completed scrobbles behind it -- both the
-      // evidence needed to tell a live entry from a stuck one, and the track to
-      // fall back to when it is stuck.
-      "&format=json&limit=3";
+      "&format=json&limit=1";
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -143,99 +29,11 @@ module.exports = async (req, res) => {
     }
 
     const data = await response.json();
-    const tracks =
-      data && data.recenttracks && data.recenttracks.track
-        ? [].concat(data.recenttracks.track)
-        : [];
+    const track = data && data.recenttracks && data.recenttracks.track
+      ? [].concat(data.recenttracks.track)[0]
+      : null;
 
     res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
-
-    const nowPlaying = tracks.find(
-      (t) => t["@attr"] && t["@attr"].nowplaying === "true"
-    );
-    // The most recent thing actually finished and recorded, which is the only
-    // dated point of reference in the response.
-    const lastScrobble = tracks.find((t) => t.date && t.date.uts);
-    const scrobbleAgeMs = lastScrobble
-      ? Date.now() - Number(lastScrobble.date.uts) * 1000
-      : null;
-
-    // Track identity, so a changed entry resets the clock.
-    const key = nowPlaying
-      ? `${(nowPlaying.artist && nowPlaying.artist["#text"]) || ""} - ${nowPlaying.name || ""}`
-      : null;
-    if (!key) {
-      // Nothing to watch. The last entry has to be forgotten here, or its clock
-      // keeps running while nothing is playing at all -- and putting that same
-      // track on again hours later would then look like it had been sat there
-      // the whole time, which is the one thing this is meant not to do.
-      seenKey = null;
-      seenAt = 0;
-    } else if (key !== seenKey) {
-      seenKey = key;
-      seenAt = Date.now();
-    }
-    const heldForMs = key ? Date.now() - seenAt : 0;
-
-    // How long this entry could honestly still be playing for: its own length
-    // where Last.fm knows it, otherwise how long the track before it ran.
-    const durationMs = nowPlaying ? await trackDurationMs(nowPlaying, apiKey) : 0;
-    const gapMs = observedGapMs(tracks);
-    let expectedMs;
-    if (durationMs > 0) {
-      expectedMs = durationMs + DURATION_SLACK_MS;
-    } else if (gapMs !== null) {
-      expectedMs = Math.min(
-        Math.max(gapMs + DURATION_SLACK_MS, OBSERVED_GAP_FLOOR_MS),
-        OBSERVED_GAP_CEILING_MS
-      );
-    } else {
-      expectedMs = UNKNOWN_DURATION_WINDOW_MS;
-    }
-
-    // Both conditions, not either. Sat there past its own length says the track
-    // cannot still be running; silence behind it says the scrobbler is not
-    // recording anything either. One without the other is ordinary listening --
-    // in particular a track on repeat outlives its duration but re-scrobbles
-    // each time round, which is what the second condition is there to notice.
-    //
-    // A missing scrobble age is not silence -- it is no history to judge
-    // against, which is a reason to leave the entry alone rather than to doubt
-    // it. Counting it as evidence also removed the only thing there was to fall
-    // back to, so the widget vanished outright instead of showing anything.
-    const stale =
-      Boolean(nowPlaying) &&
-      heldForMs > expectedMs &&
-      scrobbleAgeMs !== null &&
-      scrobbleAgeMs > expectedMs;
-
-    const track = stale ? lastScrobble : nowPlaying || lastScrobble || null;
-
-    if (req.query && req.query.diag) {
-      // Timings and flags only -- no key, no user.
-      res.status(200).json({
-        configured: true,
-        diag: {
-          tracks: tracks.length,
-          hasNowPlaying: Boolean(nowPlaying),
-          // How long this exact entry has been sat there. Resets when the
-          // track changes, which is what separates a stuck entry from someone
-          // putting music on after a long break.
-          heldForSec: Math.round(heldForMs / 1000),
-          lastScrobbleAgeSec:
-            scrobbleAgeMs === null ? null : Math.round(scrobbleAgeMs / 1000),
-          // 0 means Last.fm has no length on file for this track, in which
-          // case the window comes from the scrobble gap instead.
-          trackDurationSec: Math.round(durationMs / 1000),
-          observedGapSec: gapMs === null ? null : Math.round(gapMs / 1000),
-          windowSource:
-            durationMs > 0 ? "duration" : gapMs !== null ? "gap" : "default",
-          expectedWindowSec: Math.round(expectedMs / 1000),
-          treatedAsStale: stale,
-        },
-      });
-      return;
-    }
 
     // Nothing scrobbled at all: nothing to show either way.
     if (!track) {
@@ -243,12 +41,9 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // When the now-playing entry was judged stale, `track` is the last scrobble
-    // instead -- which carries a date and no nowplaying flag, so this would read
-    // false anyway. The explicit check states the rule rather than leaning on
-    // that coincidence.
-    const isNowPlaying =
-      !stale && Boolean(track["@attr"] && track["@attr"].nowplaying === "true");
+    const isNowPlaying = Boolean(
+      track["@attr"] && track["@attr"].nowplaying === "true"
+    );
 
     const images = Array.isArray(track.image) ? track.image : [];
     const preferred =
