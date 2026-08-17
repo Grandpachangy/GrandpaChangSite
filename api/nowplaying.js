@@ -40,14 +40,35 @@
 // an afternoon.
 const DURATION_SLACK_MS = 5 * 60 * 1000;
 
-// Used when Last.fm has no duration on file, which happens for uploads and
-// obscure tracks. Nothing then says how long the thing runs, so this is the
-// one genuine guess left. Half an hour, erring towards admitting we do not
-// know: a stuck entry claiming to still be playing is the failure worth
-// avoiding, and the cost of being wrong is a long track showing as "last
-// played" while it is in fact still going -- visibly stale rather than
-// confidently false.
+// Last.fm often has no length on file -- uploads, mixes, anything obscure --
+// and this account's tracks are all of that kind, so the fallback is the path
+// that actually runs rather than a corner case.
+//
+// The gap between the two most recent scrobbles stands in for a length. It is
+// how long the track before this one really ran, measured rather than assumed,
+// and it comes out of the response already being fetched. Someone playing
+// three-minute songs and someone playing hour-long sets want very different
+// windows, and this is the difference between them stated in their own data.
+//
+// Clamped at both ends: a floor so a run of very short tracks cannot make the
+// window twitchy, and a ceiling so a gap that is really a break -- stopped at
+// midnight, started again at noon -- cannot stretch it to something useless.
+const OBSERVED_GAP_FLOOR_MS = 10 * 60 * 1000;
+const OBSERVED_GAP_CEILING_MS = 90 * 60 * 1000;
+
+// Only when there is not even a second scrobble to measure against.
 const UNKNOWN_DURATION_WINDOW_MS = 30 * 60 * 1000;
+
+// How long the previous track ran, from the timestamps we already have.
+function observedGapMs(tracks) {
+  const dated = tracks
+    .filter((t) => t.date && t.date.uts)
+    .map((t) => Number(t.date.uts) * 1000)
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => b - a);
+  if (dated.length < 2) return null;
+  return dated[0] - dated[1];
+}
 
 // The entry currently being watched, and when it first appeared. Module scope,
 // so a recycled instance forgets and gives a stuck entry the benefit of the
@@ -156,10 +177,21 @@ module.exports = async (req, res) => {
     }
     const heldForMs = key ? Date.now() - seenAt : 0;
 
-    // How long this entry could honestly still be playing for.
+    // How long this entry could honestly still be playing for: its own length
+    // where Last.fm knows it, otherwise how long the track before it ran.
     const durationMs = nowPlaying ? await trackDurationMs(nowPlaying, apiKey) : 0;
-    const expectedMs =
-      durationMs > 0 ? durationMs + DURATION_SLACK_MS : UNKNOWN_DURATION_WINDOW_MS;
+    const gapMs = observedGapMs(tracks);
+    let expectedMs;
+    if (durationMs > 0) {
+      expectedMs = durationMs + DURATION_SLACK_MS;
+    } else if (gapMs !== null) {
+      expectedMs = Math.min(
+        Math.max(gapMs + DURATION_SLACK_MS, OBSERVED_GAP_FLOOR_MS),
+        OBSERVED_GAP_CEILING_MS
+      );
+    } else {
+      expectedMs = UNKNOWN_DURATION_WINDOW_MS;
+    }
 
     // Both conditions, not either. Sat there past its own length says the track
     // cannot still be running; silence behind it says the scrobbler is not
@@ -192,9 +224,12 @@ module.exports = async (req, res) => {
           heldForSec: Math.round(heldForMs / 1000),
           lastScrobbleAgeSec:
             scrobbleAgeMs === null ? null : Math.round(scrobbleAgeMs / 1000),
-          // 0 means Last.fm has no length on file for this track, so the
-          // window below is the fallback rather than the track's own length.
+          // 0 means Last.fm has no length on file for this track, in which
+          // case the window comes from the scrobble gap instead.
           trackDurationSec: Math.round(durationMs / 1000),
+          observedGapSec: gapMs === null ? null : Math.round(gapMs / 1000),
+          windowSource:
+            durationMs > 0 ? "duration" : gapMs !== null ? "gap" : "default",
           expectedWindowSec: Math.round(expectedMs / 1000),
           treatedAsStale: stale,
         },
