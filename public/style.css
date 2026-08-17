@@ -2523,6 +2523,13 @@ html:not(.js) h2::after {
   color: var(--tier, var(--moon));
 }
 
+/* A rank that couldn't be refreshed. Quiet rather than alarming -- the number
+   is almost certainly still right, and a visitor doesn't need to be told about
+   Riot's availability in red. */
+.account__tier.is-stale {
+  opacity: 0.6;
+}
+
 .account__lp {
   font-size: 0.76rem;
   color: var(--moon-dim);

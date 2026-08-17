@@ -242,6 +242,13 @@ async function checkLive() {
 
   try {
     const res = await fetch("/api/live");
+    // The worst version of this bug on the site. A 500 body has no `live`, so
+    // it read as "not live" and took the offline branch below -- which tears
+    // the embed down and points the iframe at about:blank. One failed poll
+    // therefore ended the stream for whoever was watching, and the next poll a
+    // minute later reloaded the player from scratch rather than resuming.
+    // Throwing keeps the player exactly as it is until an answer arrives.
+    if (!res.ok) throw new Error(`live endpoint returned ${res.status}`);
     const data = await res.json();
 
     setTitleLive(Boolean(data.live));
@@ -293,6 +300,10 @@ function timeAgo(dateStr) {
 async function loadVods() {
   try {
     const res = await fetch("/api/vods");
+    // Without this a failed request reported "No VODs found yet", which is a
+    // statement about the channel rather than about the request -- and the
+    // catch below already has the right words for it.
+    if (!res.ok) throw new Error(`vods endpoint returned ${res.status}`);
     const data = await res.json();
 
     if (!data.vods || data.vods.length === 0) {
@@ -410,7 +421,14 @@ syncDockHeight();
 // 20s rather than 10s: a track change showing up half a minute late costs
 // nothing, and this halves both the function calls and the DOM work that
 // every response drags with it. Polling still stops entirely on a hidden tab.
-const NOWPLAYING_POLL_MS = 20 * 1000;
+// 10s. The endpoint caches for 5s at the edge, so the track can be up to about
+// 15s behind rather than 25s. This is a Last.fm call, not a Riot one -- it has
+// nothing to do with the rate budget that made the other intervals worth
+// stretching, and the delay was the thing people actually noticed.
+//
+// The rest of the lag isn't ours: a scrobbler pushes "now playing" to Last.fm
+// on its own schedule, which is where the first several seconds go.
+const NOWPLAYING_POLL_MS = 10 * 1000;
 const nowPlayingEl = document.getElementById("nowplaying");
 const npArt = document.getElementById("np-art");
 const npTitle = document.getElementById("np-title");
@@ -442,6 +460,11 @@ function stopNowPlayingPolling() {
 async function checkNowPlaying() {
   try {
     const res = await fetch("/api/nowplaying");
+    // A 500 body carries an `error`, no `title` -- which fell straight into the
+    // "nothing ever scrobbled" branch below and hid the card. One bad poll made
+    // the music disappear, and it stayed gone until a later poll happened to
+    // succeed. Throwing here holds whatever is already on screen instead.
+    if (!res.ok) throw new Error(`nowplaying endpoint returned ${res.status}`);
     const data = await res.json();
 
     // Credentials not set yet: stop polling rather than hammering the endpoint.
@@ -1241,6 +1264,13 @@ function renderAccounts() {
     } else {
       tier.textContent = "Unranked";
     }
+    // A rank the server couldn't refresh this sweep. Shown rather than hidden,
+    // because a few-minute-old rank beats "Unavailable" -- but marked, because
+    // showing it as current would be a lie.
+    if (acc.stale) {
+      tier.classList.add("is-stale");
+      tier.title = "Riot didn't answer just now; this is the last known rank.";
+    }
     rank.appendChild(tier);
 
     if (label) {
@@ -1283,7 +1313,11 @@ async function loadAccounts() {
     }
 
     accountsData = data;
-    accountsLoaded = true;
+    // Only a clean sweep is worth latching. A degraded one used to stick for
+    // the whole page view: the panel had been opened once while Riot was
+    // rate-limiting, and every reopen after that re-rendered the same wall of
+    // "Unavailable" without ever asking again.
+    accountsLoaded = !data.degraded;
     accountsStatus.classList.add("is-hidden");
     renderAccounts();
   } catch (err) {
