@@ -3,6 +3,26 @@
 // YouTube Music (via a scrobbler extension) through one endpoint.
 // Reading public scrobbles needs only an API key -- no OAuth.
 
+// How long a "now playing" entry is believed once nothing new has been
+// scrobbled behind it.
+//
+// Last.fm holds a now-playing entry until a scrobbler replaces it. Close the
+// player mid-track and that replacement never comes, so the entry sits there
+// indefinitely -- which is why the card read "Now playing" for hours after the
+// music stopped. The entry carries no timestamp, so it cannot say how old it
+// is on its own.
+//
+// The history behind it can. A scrobbler that is alive keeps scrobbling: Last.fm
+// records a track once it has played for four minutes or half its length,
+// whichever comes first, so even an hour-long mix lands a scrobble minutes in.
+// A now-playing claim with hours of silence behind it is therefore a scrobbler
+// that went away, not music that is still going.
+//
+// Two hours is deliberately generous -- longer than any single track anyone
+// would queue -- because wrongly hiding real music is worse than being slow to
+// notice it stopped.
+const NOWPLAYING_TRUST_MS = 2 * 60 * 60 * 1000;
+
 module.exports = async (req, res) => {
   const user = process.env.LASTFM_USER;
   const apiKey = process.env.LASTFM_API_KEY;
@@ -21,7 +41,11 @@ module.exports = async (req, res) => {
       "?method=user.getrecenttracks" +
       `&user=${encodeURIComponent(user)}` +
       `&api_key=${encodeURIComponent(apiKey)}` +
-      "&format=json&limit=1";
+      // Three, not one. A now-playing entry occupies the first slot, so asking
+      // for a single track hid the completed scrobbles behind it -- both the
+      // evidence needed to tell a live entry from a stuck one, and the track to
+      // fall back to when it is stuck.
+      "&format=json&limit=3";
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -29,11 +53,47 @@ module.exports = async (req, res) => {
     }
 
     const data = await response.json();
-    const track = data && data.recenttracks && data.recenttracks.track
-      ? [].concat(data.recenttracks.track)[0]
-      : null;
+    const tracks =
+      data && data.recenttracks && data.recenttracks.track
+        ? [].concat(data.recenttracks.track)
+        : [];
 
     res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
+
+    const nowPlaying = tracks.find(
+      (t) => t["@attr"] && t["@attr"].nowplaying === "true"
+    );
+    // The most recent thing actually finished and recorded, which is the only
+    // dated point of reference in the response.
+    const lastScrobble = tracks.find((t) => t.date && t.date.uts);
+    const scrobbleAgeMs = lastScrobble
+      ? Date.now() - Number(lastScrobble.date.uts) * 1000
+      : null;
+
+    // Believed unless the silence behind it says otherwise. With no scrobble
+    // history at all there is nothing to weigh it against, so it stands.
+    const stale =
+      Boolean(nowPlaying) &&
+      scrobbleAgeMs !== null &&
+      scrobbleAgeMs > NOWPLAYING_TRUST_MS;
+
+    const track = stale ? lastScrobble : nowPlaying || lastScrobble || null;
+
+    if (req.query && req.query.diag) {
+      // Timings and flags only -- no key, no user.
+      res.status(200).json({
+        configured: true,
+        diag: {
+          tracks: tracks.length,
+          hasNowPlaying: Boolean(nowPlaying),
+          lastScrobbleAgeSec:
+            scrobbleAgeMs === null ? null : Math.round(scrobbleAgeMs / 1000),
+          trustWindowSec: NOWPLAYING_TRUST_MS / 1000,
+          treatedAsStale: stale,
+        },
+      });
+      return;
+    }
 
     // Nothing scrobbled at all: nothing to show either way.
     if (!track) {
@@ -41,9 +101,12 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const isNowPlaying = Boolean(
-      track["@attr"] && track["@attr"].nowplaying === "true"
-    );
+    // When the now-playing entry was judged stale, `track` is the last scrobble
+    // instead -- which carries a date and no nowplaying flag, so this would read
+    // false anyway. The explicit check states the rule rather than leaning on
+    // that coincidence.
+    const isNowPlaying =
+      !stale && Boolean(track["@attr"] && track["@attr"].nowplaying === "true");
 
     const images = Array.isArray(track.image) ? track.image : [];
     const preferred =
