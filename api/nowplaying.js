@@ -2,6 +2,14 @@
 // track there, so this covers Spotify (native scrobbling) and YouTube /
 // YouTube Music (via a scrobbler extension) through one endpoint.
 // Reading public scrobbles needs only an API key -- no OAuth.
+//
+// Last.fm answers "what" well and "is it still playing" badly: an announced
+// track cannot be retracted, so a paused one keeps reading as playing until the
+// entry expires by itself. Web Scrobbler's webhook covers that where it is set
+// up (api/scrobbler-hook.js), and where it is not this behaves exactly as it
+// always has.
+
+const { readPlayState } = require("./_playstate");
 
 module.exports = async (req, res) => {
   const user = process.env.LASTFM_USER;
@@ -21,7 +29,9 @@ module.exports = async (req, res) => {
       "?method=user.getrecenttracks" +
       `&user=${encodeURIComponent(user)}` +
       `&api_key=${encodeURIComponent(apiKey)}` +
-      "&format=json&limit=1";
+      // Three, so that when a pause overrides a still-live now-playing entry
+      // there is a real, dated scrobble behind it to show instead.
+      "&format=json&limit=3";
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -29,11 +39,50 @@ module.exports = async (req, res) => {
     }
 
     const data = await response.json();
-    const track = data && data.recenttracks && data.recenttracks.track
-      ? [].concat(data.recenttracks.track)[0]
-      : null;
+    const tracks =
+      data && data.recenttracks && data.recenttracks.track
+        ? [].concat(data.recenttracks.track)
+        : [];
 
     res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
+
+    const nowPlaying = tracks.find(
+      (t) => t["@attr"] && t["@attr"].nowplaying === "true"
+    );
+    const lastScrobble = tracks.find((t) => t.date && t.date.uts);
+
+    // Only asked when there is something for it to contradict. The signal can
+    // only switch the card off, so it has nothing to say while Last.fm already
+    // reports nothing playing -- which is most of the day. Skipping the lookup
+    // there keeps this within the free tier's command budget.
+    const live =
+      nowPlaying || (req.query && req.query.diag) ? await readPlayState() : null;
+
+    // The signal can switch the card off. It cannot switch it on.
+    //
+    // Off is the point and is safe: Web Scrobbler said playback stopped, which
+    // is better evidence than an entry Last.fm has not expired. On would mean
+    // naming a track before Last.fm knows about it, and the only one available
+    // to name then is the previous one -- confidently the wrong song.
+    const paused = Boolean(live && live.state === "paused");
+    const track = paused ? lastScrobble || nowPlaying : nowPlaying || lastScrobble;
+
+    if (req.query && req.query.diag) {
+      res.status(200).json({
+        configured: true,
+        diag: {
+          lastfmSaysPlaying: Boolean(nowPlaying),
+          webhookSignal: live ? live.state : null,
+          webhookEvent: live ? live.event : null,
+          webhookAgeSec: live ? Math.round((Date.now() - live.at) / 1000) : null,
+          overrodeToPaused: paused && Boolean(nowPlaying),
+          webhookTitle: live ? live.title : null,
+          webhookArtist: live ? live.artist : null,
+          lastfmTitle: (nowPlaying || lastScrobble || {}).name || null,
+        },
+      });
+      return;
+    }
 
     // Nothing scrobbled at all: nothing to show either way.
     if (!track) {
@@ -41,9 +90,8 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const isNowPlaying = Boolean(
-      track["@attr"] && track["@attr"].nowplaying === "true"
-    );
+    const isNowPlaying =
+      !paused && Boolean(track["@attr"] && track["@attr"].nowplaying === "true");
 
     const images = Array.isArray(track.image) ? track.image : [];
     const preferred =
