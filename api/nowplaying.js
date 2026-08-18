@@ -51,19 +51,23 @@ module.exports = async (req, res) => {
     );
     const lastScrobble = tracks.find((t) => t.date && t.date.uts);
 
-    // Only asked when there is something for it to contradict. The signal can
-    // only switch the card off, so it has nothing to say while Last.fm already
-    // reports nothing playing -- which is most of the day. Skipping the lookup
-    // there keeps this within the free tier's command budget.
+    // Skipped when there is plainly nothing going on, because a lookup on every
+    // revalidation around the clock would run past the free tier's command
+    // budget. "Plainly nothing" has to mean more than "Last.fm reports nothing
+    // playing", though: after a pause Last.fm's entry expires and is never
+    // re-announced, so a resumed track has no entry at all -- and gating on one
+    // meant the signal that could have switched the card back on was never
+    // read. A scrobble within the hour is the wider net.
+    const SESSION_WINDOW_MS = 60 * 60 * 1000;
+    const scrobbleAgeMs = lastScrobble
+      ? Date.now() - Number(lastScrobble.date.uts) * 1000
+      : null;
+    const maybeListening =
+      Boolean(nowPlaying) ||
+      (scrobbleAgeMs !== null && scrobbleAgeMs < SESSION_WINDOW_MS);
     const live =
-      nowPlaying || (req.query && req.query.diag) ? await readPlayState() : null;
+      maybeListening || (req.query && req.query.diag) ? await readPlayState() : null;
 
-    // The signal can switch the card off. It cannot switch it on.
-    //
-    // Off is the point and is safe: Web Scrobbler said playback stopped, which
-    // is better evidence than an entry Last.fm has not expired. On would mean
-    // naming a track before Last.fm knows about it, and the only one available
-    // to name then is the previous one -- confidently the wrong song.
     const paused = Boolean(live && live.state === "paused");
 
     // The same track either way -- pausing changes the label, not the subject.
@@ -98,8 +102,39 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // Switching the card on from the signal, not only off.
+    //
+    // The original rule was off-only, on the grounds that naming a track before
+    // Last.fm knew about it meant naming the previous one. That turned out to
+    // strand a resumed track: Last.fm's entry expires during the pause and Web
+    // Scrobbler never re-announces it, so nothing could put the card back.
+    //
+    // Naming is not the problem it was, because the event carries the title.
+    // The card is only switched on when that title matches the track about to
+    // be shown -- Last.fm is still the one naming it, and the signal only
+    // confirms that this is what is running. A mismatch falls through to off,
+    // which is the safe direction.
+    //
+    // The freshness bound is what stops a browser that was closed mid-track,
+    // and so never sent a pause, from pinning the card. A long mix stays alive
+    // through it because Last.fm scrobbles partway through and that event
+    // refreshes the timestamp.
+    const SIGNAL_FRESH_MS = 30 * 60 * 1000;
+    const sameTrack =
+      live &&
+      live.title &&
+      track.name &&
+      live.title.trim().toLowerCase() === track.name.trim().toLowerCase();
+    const signalSaysPlaying =
+      live &&
+      live.state === "playing" &&
+      Date.now() - live.at < SIGNAL_FRESH_MS &&
+      sameTrack;
+
     const isNowPlaying =
-      !paused && Boolean(track["@attr"] && track["@attr"].nowplaying === "true");
+      !paused &&
+      (Boolean(track["@attr"] && track["@attr"].nowplaying === "true") ||
+        Boolean(signalSaysPlaying));
 
     const images = Array.isArray(track.image) ? track.image : [];
     const preferred =

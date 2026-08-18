@@ -12,7 +12,7 @@
 // simply not interesting still answers 200. Only a bad key is refused, and that
 // can never be the extension: the key is in the URL it was given.
 
-const { kvConfigured, writePlayState } = require("./_playstate");
+const { kvConfigured, writePlayState, readPlayState } = require("./_playstate");
 
 const PLAYING_EVENTS = new Set(["nowplaying", "resumedplaying"]);
 const PAUSED_EVENTS = new Set(["paused"]);
@@ -79,8 +79,32 @@ module.exports = async (req, res) => {
   const isPlaying = PLAYING_EVENTS.has(eventName);
   const isPaused = PAUSED_EVENTS.has(eventName);
 
-  // Everything else -- scrobble, loved, anything added later -- is fine and
-  // simply not a state change.
+  // A scrobble is not a state change, but it is proof of life. Last.fm records
+  // a track partway through while it is still running, so this arrives during
+  // playback -- which is exactly what an hour-long mix needs, since nothing
+  // else is sent between its start and its end and the reader treats a stale
+  // signal as unreliable.
+  //
+  // It can only refresh a state that is already "playing". A scrobble can
+  // arrive just after a pause, when the track passed the halfway mark before
+  // stopping, and turning that into "playing" would undo the pause.
+  if (eventName === "scrobble") {
+    try {
+      const current = await readPlayState();
+      if (current && current.state === "playing") {
+        await writePlayState({ ...current, at: Date.now(), event: "scrobble" });
+        res.status(200).json({ ok: true, refreshed: true });
+        return;
+      }
+    } catch (err) {
+      console.error("scrobbler-hook: refresh failed:", err.message);
+    }
+    res.status(200).json({ ok: true, ignored: "scrobble" });
+    return;
+  }
+
+  // Everything else -- loved, anything added later -- is fine and simply not a
+  // state change.
   if (!isPlaying && !isPaused) {
     res.status(200).json({ ok: true, ignored: eventName || "unknown" });
     return;
