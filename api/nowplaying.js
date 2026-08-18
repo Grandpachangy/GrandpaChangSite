@@ -115,11 +115,23 @@ module.exports = async (req, res) => {
     // confirms that this is what is running. A mismatch falls through to off,
     // which is the safe direction.
     //
-    // The freshness bound is what stops a browser that was closed mid-track,
-    // and so never sent a pause, from pinning the card. A long mix stays alive
-    // through it because Last.fm scrobbles partway through and that event
-    // refreshes the timestamp.
-    const SIGNAL_FRESH_MS = 30 * 60 * 1000;
+    // Five minutes, measured rather than picked. Closing the tab sends no event
+    // at all -- twenty-four samples across a close, every one still the
+    // `nowplaying` from when the track started -- so the only thing bounding a
+    // closed browser is how long this stays believable. At thirty minutes it
+    // would have out-lived Last.fm's own entry, which expires in about the
+    // length of the track, and made the card worse than before any of this.
+    //
+    // Five is enough for what switching on is actually for: a track resumed
+    // after a pause, where Last.fm's entry expired during the pause and the
+    // remaining play time is minutes. It is not needed for long content, where
+    // Last.fm's entry lasts the length of the track and covers it anyway.
+    //
+    // The cost is a long track resumed near its start reverting to "last
+    // played" while it is still running. That is the direction to fail in:
+    // claiming music is playing when it stopped is the complaint this exists
+    // to answer.
+    const SIGNAL_FRESH_MS = 5 * 60 * 1000;
     const sameTrack =
       live &&
       live.title &&
