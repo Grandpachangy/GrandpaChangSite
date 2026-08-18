@@ -65,7 +65,15 @@ module.exports = async (req, res) => {
     // naming a track before Last.fm knows about it, and the only one available
     // to name then is the previous one -- confidently the wrong song.
     const paused = Boolean(live && live.state === "paused");
-    const track = paused ? lastScrobble || nowPlaying : nowPlaying || lastScrobble;
+
+    // The same track either way -- pausing changes the label, not the subject.
+    // Falling back to the previous scrobble when paused named the wrong song:
+    // the track just paused has not been scrobbled yet, since Last.fm only
+    // records one partway through, so the card announced whatever came before
+    // it. Last.fm's now-playing entry is the track that was actually paused,
+    // and it carries the artwork and link that the webhook's plain text does
+    // not.
+    const track = nowPlaying || lastScrobble;
 
     if (req.query && req.query.diag) {
       res.status(200).json({
@@ -100,8 +108,16 @@ module.exports = async (req, res) => {
       images[images.length - 1] ||
       {};
     const art = typeof preferred["#text"] === "string" ? preferred["#text"] : "";
+
+    // A scrobble carries its own timestamp. A now-playing entry does not -- so
+    // when one is being shown as paused, the moment the pause was reported is
+    // the honest answer for "when", and it is the one the viewer means anyway.
     const playedAt =
-      track.date && track.date.uts ? Number(track.date.uts) : null;
+      track.date && track.date.uts
+        ? Number(track.date.uts)
+        : paused && live && live.at
+          ? Math.floor(live.at / 1000)
+          : null;
 
     // The most recent track is returned either way; `playing` says whether it
     // is live right now or the last thing scrobbled.
