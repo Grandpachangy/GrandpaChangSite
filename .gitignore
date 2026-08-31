@@ -5,3 +5,6 @@ node_modules
 
 # Images the harness drops into the repo root when pasted in chat
 image-*.png
+
+# Finder view settings. macOS writes one into every folder it opens.
+.DS_Store
