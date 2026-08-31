@@ -57,8 +57,16 @@ module.exports = async (req, res) => {
     // playing", though: after a pause Last.fm's entry expires and is never
     // re-announced, so a resumed track has no entry at all -- and gating on one
     // meant the signal that could have switched the card back on was never
-    // read. A scrobble within the hour is the wider net.
-    const SESSION_WINDOW_MS = 60 * 60 * 1000;
+    // read. A recent scrobble is the wider net.
+    //
+    // Three hours, not one. An hour was still too tight for long content: a
+    // mix scrobbles once a few minutes in and then says nothing, so pausing and
+    // resuming seventy minutes later left the last scrobble outside the window,
+    // the signal unread, and the card stuck on "last played" for the rest of
+    // it. Three hours clears any plausible single track while still making no
+    // reads at all on a site nobody has listened to in a while, which is what
+    // the budget actually depends on.
+    const SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
     const scrobbleAgeMs = lastScrobble
       ? Date.now() - Number(lastScrobble.date.uts) * 1000
       : null;
@@ -68,8 +76,6 @@ module.exports = async (req, res) => {
     const live =
       maybeListening || (req.query && req.query.diag) ? await readPlayState() : null;
 
-    const paused = Boolean(live && live.state === "paused");
-
     // The same track either way -- pausing changes the label, not the subject.
     // Falling back to the previous scrobble when paused named the wrong song:
     // the track just paused has not been scrobbled yet, since Last.fm only
@@ -78,6 +84,25 @@ module.exports = async (req, res) => {
     // and it carries the artwork and link that the webhook's plain text does
     // not.
     const track = nowPlaying || lastScrobble;
+
+    // Does the signal refer to the track being shown? Both directions need this
+    // and for the same reason: an event is about one track and says nothing
+    // about a different one.
+    const sameTrack = Boolean(
+      live &&
+        live.title &&
+        track &&
+        track.name &&
+        live.title.trim().toLowerCase() === track.name.trim().toLowerCase()
+    );
+
+    // A pause silences only the track it was about. Without this it silenced
+    // everything for the twelve hours of STATE_TTL_SEC: pause YouTube at night,
+    // put music on from a phone or a browser without the extension the next
+    // morning, and the card insisted it was still paused and dated itself from
+    // the old pause. The playing direction already had this guard; the pause
+    // direction is where it was actually load-bearing.
+    const paused = Boolean(live && live.state === "paused" && sameTrack);
 
     if (req.query && req.query.diag) {
       res.status(200).json({
@@ -132,11 +157,6 @@ module.exports = async (req, res) => {
     // claiming music is playing when it stopped is the complaint this exists
     // to answer.
     const SIGNAL_FRESH_MS = 5 * 60 * 1000;
-    const sameTrack =
-      live &&
-      live.title &&
-      track.name &&
-      live.title.trim().toLowerCase() === track.name.trim().toLowerCase();
     const signalSaysPlaying =
       live &&
       live.state === "playing" &&

@@ -47,7 +47,22 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const offered = req.query && req.query.key;
+  // Header first, query string second.
+  //
+  // Web Scrobbler's webhook configuration accepts only a URL, so in practice
+  // the key arrives in the query string -- and request URLs, query strings
+  // included, are written to Vercel's runtime logs and to any intermediary
+  // along the way. This key is therefore log-exposed rather than secret,
+  // whatever storing it as an environment variable implies: anyone who can
+  // read the logs, or a screenshot of them, can post play state to the site.
+  // Rotate it if logs are ever shared. The header is accepted so anything that
+  // can set one -- a future Web Scrobbler, or anything else posting here --
+  // has a way to stay out of the URL.
+  const offered =
+    (typeof req.headers["x-scrobbler-key"] === "string"
+      ? req.headers["x-scrobbler-key"]
+      : null) ||
+    (req.query && req.query.key);
   if (typeof offered !== "string" || offered !== secret) {
     res.status(401).json({ error: "Unauthorized" });
     return;
