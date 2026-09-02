@@ -73,6 +73,12 @@ function readPerfChoice() {
 // asked for by answering, and it is read by nobody else.
 // ---------------------------------------------------------------------------
 const CONSENT_KEY = "consent:embeds";
+// Embeds turned on one at a time, from the panel that stands in for each.
+// Separate from the answer above on purpose: agreeing to load the chat is not
+// agreeing to load the stream player, and treating it as such -- which an
+// earlier version did, by writing "granted" from the per-embed button -- turns
+// a narrow yes into a blanket one the visitor never gave.
+const EMBED_ALLOW_KEY = "consent:embeds:allowed";
 const consentBar = document.getElementById("consent");
 
 function consentChoice() {
@@ -96,12 +102,37 @@ function rememberConsent(value) {
   }
 }
 
+function allowedEmbedList() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(EMBED_ALLOW_KEY) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+// One embed, not all of them. A blanket yes covers everything; otherwise only
+// what has been turned on individually.
+function embedAllowed(id) {
+  return embedsAllowed() || allowedEmbedList().includes(id);
+}
+
+function allowEmbed(id) {
+  const list = allowedEmbedList();
+  if (!list.includes(id)) list.push(id);
+  try {
+    localStorage.setItem(EMBED_ALLOW_KEY, JSON.stringify(list));
+  } catch (err) {
+    /* Lasts for this page view, which is still what was asked for. */
+  }
+}
+
 // Added only once embeds are allowed. As <link> tags in the head these fired on
 // page load and reached all three services before anyone had answered, which
 // would have made the gate below decorative.
 let warmedUp = false;
 function warmUpEmbedHosts() {
-  if (warmedUp || !embedsAllowed()) return;
+  if (warmedUp) return;
   warmedUp = true;
   for (const host of [
     "https://itzon.tv",
@@ -312,12 +343,12 @@ function setSidestream(open) {
   // Only hold a connection while it's actually on screen.
   // Opening this is a deliberate click, but it is still Twitch being contacted,
   // so it waits on the same answer as the others.
-  if (open && !embedsAllowed()) {
+  if (open && !embedAllowed("sidestream")) {
     sidestreamFrame.src = "about:blank";
     if (!sidestreamFrame.parentElement.querySelector(".embed-gate")) {
       sidestreamFrame.parentElement.appendChild(
         embedPlaceholder("The side stream", "Load the side stream", () => {
-          rememberConsent("granted");
+          allowEmbed("sidestream");
           warmUpEmbedHosts();
           setSidestream(true);
         })
@@ -347,13 +378,13 @@ function showLivePlayer() {
 
   // Live, but not allowed to load the player yet. Show the section with a gate
   // in it rather than nothing, so the stream is visibly there to be turned on.
-  if (!embedsAllowed()) {
+  if (!embedAllowed("player")) {
     livePlayerSection.classList.remove("is-hidden");
     offlinePanel.classList.add("is-hidden");
     if (!livePlayerFrame.parentElement.querySelector(".embed-gate")) {
       livePlayerFrame.parentElement.appendChild(
         embedPlaceholder("The stream player", "Load the stream", () => {
-          rememberConsent("granted");
+          allowEmbed("player");
           warmUpEmbedHosts();
           showLivePlayer();
         })
@@ -1552,12 +1583,12 @@ function loadChat() {
   if (isChatLoaded) return;
   // Used to run unconditionally on window load, which contacted Twitch before
   // the visitor had been asked anything.
-  if (!embedsAllowed()) {
+  if (!embedAllowed("chat")) {
     const frame = document.getElementById("chat-frame");
     if (frame && !frame.querySelector(".embed-gate")) {
       frame.appendChild(
         embedPlaceholder("Twitch chat", "Load Twitch chat", () => {
-          rememberConsent("granted");
+          allowEmbed("chat");
           warmUpEmbedHosts();
           loadChat();
         })
