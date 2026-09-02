@@ -29,9 +29,13 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
 
-  <link rel="preconnect" href="https://itzon.tv" />
-  <link rel="preconnect" href="https://player.twitch.tv" />
-  <link rel="preconnect" href="https://static-cdn.jtvnw.net" crossorigin />
+  <!-- The preconnects to itzon.tv, player.twitch.tv and static-cdn.jtvnw.net
+       that used to sit here are gone. A preconnect opens DNS, TCP and TLS to
+       the host on page load, which hands those services the visitor's IP
+       before anything has been consented to -- and would have quietly undone
+       the consent gate on the embeds themselves. script.js adds them back the
+       moment embeds are allowed, so the warm-up is only lost for visitors who
+       were never going to load them. -->
   <link rel="preload" as="font" type="font/woff2" href="/fonts/space-grotesk-700-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />
@@ -499,8 +503,43 @@
     <p>Not affiliated with Twitch Interactive, Inc. Video played via Twitch's official embedded player.</p>
     <p class="site-footer__legal">
       &copy; <span id="footer-year">2026</span> GrandpaChang. All rights reserved.
+      <span class="site-footer__sep" aria-hidden="true">·</span>
+      <a href="/privacy.html">Privacy</a>
+      <span class="site-footer__sep" aria-hidden="true">·</span>
+      <!-- Withdrawing consent has to be as easy as giving it, so the choice is
+           reachable from every page rather than only on first visit. -->
+      <button type="button" class="site-footer__link" id="consent-reopen">Cookie choices</button>
     </p>
   </footer>
+
+  <!-- Consent for third-party embeds. Nothing here is decorative: the Twitch
+       chat, the itzon player and the side stream all contact services that set
+       their own cookies, and embedding them makes this site jointly
+       responsible for that transmission -- so it has to be asked before, not
+       after. Decline is a real answer and is styled the same as accept. -->
+  <div id="consent" class="consent" role="dialog" aria-modal="false"
+       aria-labelledby="consent-title" hidden>
+    <div class="consent__inner">
+      <div class="consent__text">
+        <h2 class="consent__title" id="consent-title">Embedded content</h2>
+        <p>
+          The stream player, Twitch chat and side stream load from
+          <strong>itzon.tv</strong> and <strong>Twitch</strong>. Loading them
+          shares your IP address with those services and lets them set their own
+          cookies. Nothing loads until you choose, and you can change your mind
+          any time from the footer.
+        </p>
+        <p class="consent__meta">
+          Anonymous, cookie-free visit counts are kept either way.
+          <a href="/privacy.html">What's collected</a>
+        </p>
+      </div>
+      <div class="consent__actions">
+        <button type="button" class="consent__btn" id="consent-reject">Decline</button>
+        <button type="button" class="consent__btn" id="consent-accept">Allow embeds</button>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>

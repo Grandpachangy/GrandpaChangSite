@@ -2894,3 +2894,204 @@ html:not(.js) h2::after {
     transform: none;
   }
 }
+
+/* ---------- Consent ---------- */
+
+/* Sits at the bottom rather than over the page: the question is real, but it
+   is not worth trapping someone behind before they can see anything. Nothing
+   third-party has loaded at this point either way, so there is nothing to
+   block access to. */
+.consent {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  background: rgba(10, 6, 22, 0.97);
+  border-top: 1px solid var(--edge-hi);
+  backdrop-filter: blur(10px);
+  animation: consent-rise 0.35s var(--ease-out) both;
+}
+
+.perf-lite .consent {
+  animation: none;
+  backdrop-filter: none;
+}
+
+@keyframes consent-rise {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.consent[hidden] { display: none; }
+
+.consent__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.1rem 2.25rem;
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.consent__title {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+  color: var(--moon);
+}
+
+/* The heading here is a label, not a section break, so it does not want the
+   underline every other h2 on the page carries. */
+.consent__title::after { display: none; }
+
+.consent__text { flex: 1 1 26rem; }
+
+.consent__text p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--moon-dim);
+}
+
+.consent__meta {
+  margin-top: 0.4rem !important;
+  font-size: 0.75rem !important;
+  opacity: 0.85;
+}
+
+.consent__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+/* Both buttons are the same size, weight and colour on purpose. Making
+   "decline" the quieter one is the pattern that turns a choice into a nudge. */
+.consent__btn {
+  padding: 0.6rem 1.15rem;
+  border-radius: 10px;
+  border: 1px solid var(--edge-hi);
+  background: rgba(160, 107, 255, 0.14);
+  color: var(--moon);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.consent__btn:hover,
+.consent__btn:focus-visible {
+  background: rgba(160, 107, 255, 0.26);
+  border-color: var(--violet-soft);
+}
+
+@media (max-width: 640px) {
+  .consent__inner {
+    padding: 1rem 2rem;
+    gap: 0.9rem;
+  }
+  .consent__actions { width: 100%; }
+  .consent__btn { flex: 1; }
+}
+
+/* Stands in for an embed that has not been allowed to load. */
+.embed-gate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: rgba(10, 6, 22, 0.92);
+  border-radius: inherit;
+  z-index: 3;
+}
+
+.embed-gate__text {
+  margin: 0;
+  max-width: 26rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--moon-dim);
+}
+
+.embed-gate__btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--edge-hi);
+  background: rgba(160, 107, 255, 0.16);
+  color: var(--moon);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.embed-gate__btn:hover,
+.embed-gate__btn:focus-visible {
+  background: rgba(160, 107, 255, 0.28);
+}
+
+/* Footer control that reopens the consent bar. A button, because it acts on
+   the page rather than going anywhere, styled as the links beside it. */
+.site-footer__link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.site-footer__sep { opacity: 0.5; margin: 0 0.4rem; }
+
+/* ---------- Legal pages ---------- */
+
+.legal {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 3rem 2.25rem 4rem;
+}
+
+.legal h1 { margin: 0 0 0.4rem; }
+
+.legal__updated {
+  margin: 0 0 2rem;
+  font-size: 0.8rem;
+  color: var(--moon-dim);
+}
+
+.legal h2 {
+  margin: 2.2rem 0 0.6rem;
+  font-size: 1.02rem;
+}
+
+.legal h2::after { display: none; }
+
+.legal p, .legal li {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--moon-dim);
+}
+
+.legal ul { padding-left: 1.1rem; }
+.legal li { margin-bottom: 0.35rem; }
+
+.legal a { color: var(--violet-soft); }
+
+.legal__back {
+  display: inline-block;
+  margin-bottom: 2rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .legal { padding: 2rem 2rem 3rem; }
+}

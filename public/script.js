@@ -61,6 +61,114 @@ function readPerfChoice() {
   }
 })();
 
+// ---------------------------------------------------------------------------
+// Consent for third-party embeds
+//
+// The player, the chat and the side stream are iframes served by itzon.tv and
+// Twitch. Loading one sends the visitor's IP to that service and lets it set
+// its own cookies, and it is this page loading them that causes it -- so the
+// asking has to happen first, and an unanswered question means not loading.
+//
+// The choice itself is kept in localStorage. Storing it is what the visitor
+// asked for by answering, and it is read by nobody else.
+// ---------------------------------------------------------------------------
+const CONSENT_KEY = "consent:embeds";
+const consentBar = document.getElementById("consent");
+
+function consentChoice() {
+  try {
+    return localStorage.getItem(CONSENT_KEY);
+  } catch (err) {
+    // Private browsing can throw. Treat it as undecided, which loads nothing.
+    return null;
+  }
+}
+
+function embedsAllowed() {
+  return consentChoice() === "granted";
+}
+
+function rememberConsent(value) {
+  try {
+    localStorage.setItem(CONSENT_KEY, value);
+  } catch (err) {
+    /* The choice then lasts for this page view, which is still the choice. */
+  }
+}
+
+// Added only once embeds are allowed. As <link> tags in the head these fired on
+// page load and reached all three services before anyone had answered, which
+// would have made the gate below decorative.
+let warmedUp = false;
+function warmUpEmbedHosts() {
+  if (warmedUp || !embedsAllowed()) return;
+  warmedUp = true;
+  for (const host of [
+    "https://itzon.tv",
+    "https://player.twitch.tv",
+    "https://static-cdn.jtvnw.net",
+  ]) {
+    const link = document.createElement("link");
+    link.rel = "preconnect";
+    link.href = host;
+    document.head.appendChild(link);
+  }
+}
+
+// Swapped in wherever an embed would have gone, so a declined visitor still
+// sees what is there and can change their mind for that one thing without
+// accepting everything.
+function embedPlaceholder(label, buttonLabel, onLoad) {
+  const box = document.createElement("div");
+  box.className = "embed-gate";
+  const text = document.createElement("p");
+  text.className = "embed-gate__text";
+  text.textContent = `${label} loads from a third party that sets its own cookies.`;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "embed-gate__btn";
+  // Spelled out rather than derived from the label: lower-casing that turned
+  // "Twitch chat" into "twitch chat".
+  btn.textContent = buttonLabel;
+  btn.addEventListener("click", () => {
+    // Consent for this one embed, by the click that causes it to load.
+    box.remove();
+    onLoad();
+  });
+  box.append(text, btn);
+  return box;
+}
+
+const consentListeners = [];
+function onConsentChange(fn) {
+  consentListeners.push(fn);
+}
+
+function applyConsent(value) {
+  rememberConsent(value);
+  if (consentBar) consentBar.hidden = true;
+  if (value === "granted") warmUpEmbedHosts();
+  for (const fn of consentListeners) fn(embedsAllowed());
+}
+
+if (consentBar) {
+  const accept = document.getElementById("consent-accept");
+  const reject = document.getElementById("consent-reject");
+  const reopen = document.getElementById("consent-reopen");
+  if (accept) accept.addEventListener("click", () => applyConsent("granted"));
+  if (reject) reject.addEventListener("click", () => applyConsent("denied"));
+  if (reopen) {
+    reopen.addEventListener("click", () => {
+      consentBar.hidden = false;
+      consentBar.scrollIntoView({ block: "nearest" });
+    });
+  }
+  // Only asked when it has not been answered. Re-asking someone who declined
+  // is the nagging that makes these things worthless.
+  if (consentChoice() === null) consentBar.hidden = false;
+  else if (embedsAllowed()) warmUpEmbedHosts();
+}
+
 // Keeping the live state in the tab title means a pinned or background tab
 // shows it without being switched to.
 const BASE_TITLE = document.title;
@@ -202,6 +310,24 @@ function setSidestream(open) {
   sidestream.classList.toggle("is-hidden", !open);
   sidestreamToggle.classList.toggle("is-active", open);
   // Only hold a connection while it's actually on screen.
+  // Opening this is a deliberate click, but it is still Twitch being contacted,
+  // so it waits on the same answer as the others.
+  if (open && !embedsAllowed()) {
+    sidestreamFrame.src = "about:blank";
+    if (!sidestreamFrame.parentElement.querySelector(".embed-gate")) {
+      sidestreamFrame.parentElement.appendChild(
+        embedPlaceholder("The side stream", "Load the side stream", () => {
+          rememberConsent("granted");
+          warmUpEmbedHosts();
+          setSidestream(true);
+        })
+      );
+    }
+    syncDockHeight();
+    return;
+  }
+  sidestreamFrame.parentElement.querySelector(".embed-gate")?.remove();
+
   sidestreamFrame.src = open
     ? `https://player.twitch.tv/?channel=${CHANNEL}&parent=${parentHost}&muted=true`
     : "about:blank";
@@ -218,6 +344,24 @@ const previewMode = new URLSearchParams(location.search).has("preview");
 
 function showLivePlayer() {
   if (isLiveEmbedded) return;
+
+  // Live, but not allowed to load the player yet. Show the section with a gate
+  // in it rather than nothing, so the stream is visibly there to be turned on.
+  if (!embedsAllowed()) {
+    livePlayerSection.classList.remove("is-hidden");
+    offlinePanel.classList.add("is-hidden");
+    if (!livePlayerFrame.parentElement.querySelector(".embed-gate")) {
+      livePlayerFrame.parentElement.appendChild(
+        embedPlaceholder("The stream player", "Load the stream", () => {
+          rememberConsent("granted");
+          warmUpEmbedHosts();
+          showLivePlayer();
+        })
+      );
+    }
+    return;
+  }
+  livePlayerFrame.parentElement.querySelector(".embed-gate")?.remove();
   // controls=1 hands the embed over to the browser's native player chrome,
   // which is the only way to get a volume slider here: the embed exposes no
   // message API, so nothing on this page can set the volume itself. It also
@@ -1406,6 +1550,22 @@ if (footerYear) footerYear.textContent = String(new Date().getFullYear());
 let isChatLoaded = false;
 function loadChat() {
   if (isChatLoaded) return;
+  // Used to run unconditionally on window load, which contacted Twitch before
+  // the visitor had been asked anything.
+  if (!embedsAllowed()) {
+    const frame = document.getElementById("chat-frame");
+    if (frame && !frame.querySelector(".embed-gate")) {
+      frame.appendChild(
+        embedPlaceholder("Twitch chat", "Load Twitch chat", () => {
+          rememberConsent("granted");
+          warmUpEmbedHosts();
+          loadChat();
+        })
+      );
+    }
+    return;
+  }
+  document.getElementById("chat-frame")?.querySelector(".embed-gate")?.remove();
   isChatLoaded = true;
   liveChatFrame.src = `https://www.twitch.tv/embed/${CHANNEL}/chat?parent=${parentHost}&darkpopout`;
 }
@@ -1415,6 +1575,15 @@ if (document.readyState === "complete") {
 } else {
   window.addEventListener("load", loadChat, { once: true });
 }
+
+// Answering the bar retroactively loads whatever was being held back.
+onConsentChange((allowed) => {
+  if (!allowed) return;
+  loadChat();
+  if (livePlayerSection && !livePlayerSection.classList.contains("is-hidden")) {
+    showLivePlayer();
+  }
+});
 
 checkLive();
 loadVods();
