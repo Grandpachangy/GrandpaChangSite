@@ -18,6 +18,7 @@ const {
   riotFetch,
   getPuuid,
 } = require("./_riot");
+const { proxiedImage } = require("./_img");
 
 // How long to keep checking match history after last seeing someone in a game.
 // (There was a POSTGAME_WINDOW_MS here for how long a result stayed on screen.
@@ -190,7 +191,9 @@ function championPayload(idx, championId) {
   return {
     name: champ ? champ.name : `Champion ${championId}`,
     icon: champ
-      ? `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/champion/${champ.slug}.png`
+      ? proxiedImage(
+          `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/champion/${champ.slug}.png`
+        )
       : null,
   };
 }
@@ -200,7 +203,9 @@ function spellPayload(idx, spellId) {
   if (!spell) return null;
   return {
     name: spell.name,
-    icon: `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/spell/${spell.slug}.png`,
+    icon: proxiedImage(
+      `https://ddragon.leagueoflegends.com/cdn/${idx.version}/img/spell/${spell.slug}.png`
+    ),
   };
 }
 

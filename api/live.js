@@ -1,4 +1,5 @@
 const { CHANNEL_LOGIN, twitchFetch } = require("./_twitch");
+const { proxiedImage } = require("./_img");
 
 module.exports = async (req, res) => {
   try {
@@ -13,7 +14,9 @@ module.exports = async (req, res) => {
       viewers: stream ? stream.viewer_count : null,
       startedAt: stream ? stream.started_at : null,
       thumbnailUrl: stream
-        ? stream.thumbnail_url.replace("{width}", "640").replace("{height}", "360")
+        ? proxiedImage(
+            stream.thumbnail_url.replace("{width}", "640").replace("{height}", "360")
+          )
         : null,
     });
   } catch (err) {

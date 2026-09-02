@@ -10,6 +10,7 @@
 // always has.
 
 const { readPlayState } = require("./_playstate");
+const { proxiedImage } = require("./_img");
 
 module.exports = async (req, res) => {
   const user = process.env.LASTFM_USER;
@@ -195,7 +196,9 @@ module.exports = async (req, res) => {
       artist: (track.artist && track.artist["#text"]) || "",
       album: (track.album && track.album["#text"]) || "",
       // Only pass through http(s) art URLs.
-      art: /^https?:\/\//i.test(art) ? art : null,
+      // Proxied, so album art does not reach out to Last.fm's CDN from the
+      // visitor's browser. An unrecognised host yields null and no image.
+      art: proxiedImage(art),
       url: /^https?:\/\//i.test(track.url || "") ? track.url : null,
       playedAt: isNowPlaying ? null : playedAt,
     });

@@ -1,4 +1,5 @@
 const { getBroadcasterId, twitchFetch } = require("./_twitch");
+const { proxiedImage } = require("./_img");
 
 module.exports = async (req, res) => {
   try {
@@ -13,9 +14,11 @@ module.exports = async (req, res) => {
       publishedAt: v.published_at,
       duration: v.duration,
       viewCount: v.view_count,
-      thumbnailUrl: v.thumbnail_url
-        .replace("%{width}", "440")
-        .replace("%{height}", "248"),
+      // Served from this domain rather than Twitch's CDN, so drawing the
+      // VOD grid does not hand Twitch every visitor's IP.
+      thumbnailUrl: proxiedImage(
+        v.thumbnail_url.replace("%{width}", "440").replace("%{height}", "248")
+      ),
       url: v.url,
     }));
 
